@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-system, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+}
+
+html { scroll-behavior: smooth; }
+body { background: #fffafc; color: #2b1a22; font-family: var(--font-sans); }
+.font-display { font-family: var(--font-display); }
+
+@keyframes marquee { to { transform: translateX(-50%); } }
+.animate-marquee { animation: marquee 26s linear infinite; }

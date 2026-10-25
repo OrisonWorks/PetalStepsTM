@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petal Steps by TM — Shoes That Bloom With Every Step</title>
+<meta name="description" content="Petal Steps by TM — stylish, comfortable footwear for women, men and kids. Shop sneakers, heels, sandals, boots and more.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+</head>
+<body>
+
+<header class="header" id="top">
+  <div class="announce">Free delivery on orders over R800 &nbsp;·&nbsp; Easy size exchanges &nbsp;·&nbsp; New styles dropping weekly</div>
+  <nav class="nav container">
+    <a class="logo" href="#top"><span class="logo-mark">🌸</span> Petal Steps <em>by TM</em></a>
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu">☰</button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#shop">Shop</a></li>
+      <li><a href="#categories">Categories</a></li>
+      <li><a href="#why">Why Us</a></li>
+      <li><a href="#reviews">Reviews</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="nav-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Search">🔍</button>
+      <button class="icon-btn" id="cartBtn" aria-label="Cart">🛍️ <span class="cart-count" id="cartCount">0</span></button>
+    </div>
+  </nav>
+  <div class="search-bar container" id="searchBar" hidden>
+    <input type="search" id="searchInput" placeholder="Search sneakers, heels, sandals…">
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">🌸 Petal Steps by TM</span>
+      <h1>Every step<br><span>blooms</span> with style.</h1>
+      <p>Comfortable, head-turning footwear for women, men and kids — from everyday sneakers to occasion heels. Quality pairs, honest prices, delivered to your door.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#shop">Shop the collection</a>
+        <a class="btn btn-ghost" href="#categories">Browse categories</a>
+      </div>
+      <div class="hero-stats">
+        <div><strong>500+</strong><span>Happy customers</span></div>
+        <div><strong>120+</strong><span>Styles in store</span></div>
+        <div><strong>4.9★</strong><span>Average rating</span></div>
+      </div>
+    </div>
+    <div class="hero-media">
+      <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1000&q=80&auto=format&fit=crop" alt="Featured Petal Steps sneaker">
+      <div class="hero-card">
+        <span>🔥 Trending now</span>
+        <strong>Bloom Runner Sneakers</strong>
+        <span class="price">R 899</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true"><div class="marquee-track">
+  <span>New arrivals weekly ✦ Free delivery over R800 ✦ Easy exchanges ✦ Women · Men · Kids ✦ Pay on order confirmation ✦ </span>
+  <span>New arrivals weekly ✦ Free delivery over R800 ✦ Easy exchanges ✦ Women · Men · Kids ✦ Pay on order confirmation ✦ </span>
+</div></div>
+
+<section class="section container" id="categories">
+  <div class="section-head"><span class="eyebrow">Shop by category</span><h2>Find your perfect pair</h2></div>
+  <div class="cat-grid">
+    <button class="cat-card" data-filter="women"><img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=700&q=80&auto=format&fit=crop" alt="Women's shoes"><span>Women</span><small>Heels, flats, sneakers &amp; more</small></button>
+    <button class="cat-card" data-filter="men"><img src="https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=700&q=80&auto=format&fit=crop" alt="Men's shoes"><span>Men</span><small>Sneakers, loafers &amp; boots</small></button>
+    <button class="cat-card" data-filter="kids"><img src="https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=700&q=80&auto=format&fit=crop" alt="Kids' shoes"><span>Kids</span><small>Comfy, durable &amp; fun</small></button>
+    <button class="cat-card" data-filter="sale"><img src="https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=700&q=80&auto=format&fit=crop" alt="Sale shoes"><span>Sale</span><small>Up to 40% off selected pairs</small></button>
+  </div>
+</section>
+
+<section class="section container" id="shop">
+  <div class="section-head"><span class="eyebrow">The collection</span><h2>Shop Petal Steps</h2><p class="muted">Tap a shoe to pick your size, then add it to your bag.</p></div>
+  <div class="shop-toolbar">
+    <div class="filters" id="filters">
+      <button class="pill active" data-filter="all">All</button>
+      <button class="pill" data-filter="women">Women</button>
+      <button class="pill" data-filter="men">Men</button>
+      <button class="pill" data-filter="kids">Kids</button>
+      <button class="pill" data-filter="sale">Sale</button>
+    </div>
+    <select id="sortSelect" aria-label="Sort products">
+      <option value="featured">Sort: Featured</option>
+      <option value="low">Price: Low to high</option>
+      <option value="high">Price: High to low</option>
+      <option value="name">Name A–Z</option>
+    </select>
+  </div>
+  <div class="product-grid" id="productGrid"></div>
+  <p class="empty" id="emptyState" hidden>No shoes match your search. Try another keyword or category.</p>
+</section>
+
+<section class="banner">
+  <div class="container banner-inner">
+    <div><span class="eyebrow light">Limited time</span><h2>Up to 40% off selected styles</h2><p>When they're gone, they're gone. Grab your size before it sells out.</p></div>
+    <button class="btn btn-light" data-filter-link="sale">Shop the sale</button>
+  </div>
+</section>
+
+<section class="section container" id="why">
+  <div class="section-head"><span class="eyebrow">Why Petal Steps</span><h2>Made to be walked in</h2></div>
+  <div class="why-grid">
+    <div class="why-card"><span>👟</span><h3>All-day comfort</h3><p>Cushioned soles and breathable materials, chosen for real life — not just the photo.</p></div>
+    <div class="why-card"><span>💸</span><h3>Honest prices</h3><p>Boutique look without the boutique mark-up. Regular sales and bundle deals.</p></div>
+    <div class="why-card"><span>🚚</span><h3>Fast delivery</h3><p>Orders confirmed quickly and delivered to your door. Free delivery over R800.</p></div>
+    <div class="why-card"><span>🔁</span><h3>Easy exchanges</h3><p>Wrong size? No stress — exchange for the right fit, hassle-free.</p></div>
+  </div>
+</section>
+
+<section class="section container" id="reviews">
+  <div class="section-head"><span class="eyebrow">Customer love</span><h2>What our customers say</h2></div>
+  <div class="review-grid">
+    <figure class="review"><div class="stars">★★★★★</div><blockquote>“My sneakers arrived so fast and they're even prettier in person. I wear them every day!”</blockquote><figcaption>— Naledi M.</figcaption></figure>
+    <figure class="review"><div class="stars">★★★★★</div><blockquote>“Ordered heels for a wedding. Perfect fit, super comfortable, and I danced all night.”</blockquote><figcaption>— Thandi K.</figcaption></figure>
+    <figure class="review"><div class="stars">★★★★★</div><blockquote>“Great service on Facebook — they helped me pick the right size for my daughter. Will buy again.”</blockquote><figcaption>— Lerato S.</figcaption></figure>
+  </div>
+</section>
+
+<section class="section container" id="contact">
+  <div class="contact-grid">
+    <div>
+      <span class="eyebrow">Get in touch</span><h2>Questions? Let's talk shoes.</h2>
+      <p class="muted">Message us on Facebook for the fastest reply, stock checks and size advice. You can also place your order right here on the site — we'll confirm it with you personally.</p>
+      <ul class="contact-list">
+        <li>📘 <a href="https://www.facebook.com/p/Petal-Steps-by-TM-61586015481553/" target="_blank" rel="noopener">Petal Steps by TM on Facebook</a></li>
+        <li>🕘 <span>Mon–Sat · 9:00 – 18:00</span></li>
+        <li>🚚 <span>Delivery available — free over R800</span></li>
+      </ul>
+    </div>
+    <form class="contact-form" id="contactForm">
+      <label>Your name<input required name="name" placeholder="e.g. Tumelo M."></label>
+      <label>Phone / WhatsApp<input required name="phone" placeholder="e.g. 071 234 5678"></label>
+      <label>Message<textarea required name="message" rows="4" placeholder="Hi! Do you have the Bloom Runners in size 6?"></textarea></label>
+      <button class="btn btn-primary" type="submit">Send via Facebook →</button>
+    </form>
+  </div>
+</section>
+
+<section class="newsletter">
+  <div class="container newsletter-inner">
+    <div><h2>Join the Petal List 🌸</h2><p>First dibs on new drops, restocks and members-only specials.</p></div>
+    <form id="newsletterForm"><input type="email" required placeholder="Your email address"><button class="btn btn-primary" type="submit">Subscribe</button></form>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div><a class="logo light" href="#top"><span class="logo-mark">🌸</span> Petal Steps <em>by TM</em></a><p>Footwear that blooms with every step. Women · Men · Kids.</p></div>
+    <div><h4>Shop</h4><a href="#shop">All shoes</a><a href="#categories">Women</a><a href="#categories">Men</a><a href="#categories">Kids</a></div>
+    <div><h4>Help</h4><a href="#why">Delivery &amp; exchanges</a><a href="#contact">Size advice</a><a href="#contact">Contact us</a></div>
+    <div><h4>Follow us</h4><a href="https://www.facebook.com/p/Petal-Steps-by-TM-61586015481553/" target="_blank" rel="noopener">Facebook</a></div>
+  </div>
+  <div class="container footer-bottom"><span>© <span id="year"></span> Petal Steps by TM. All rights reserved.</span><span>Prices in ZAR. Confirm stock &amp; final price when you order.</span></div>
+</footer>
+
+<!-- Quick view modal -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    <img id="modalImg" src="" alt="">
+    <div class="modal-body">
+      <span class="tag" id="modalTag"></span>
+      <h3 id="modalName"></h3>
+      <p class="muted" id="modalDesc"></p>
+      <div class="price-row"><strong id="modalPrice"></strong><s id="modalWas"></s></div>
+      <p class="label">Select size</p>
+      <div class="sizes" id="modalSizes"></div>
+      <button class="btn btn-primary full" id="modalAdd">Add to bag</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cart drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="cartDrawer" aria-hidden="true">
+  <div class="drawer-head"><h3>Your bag 🛍️</h3><button class="modal-close" id="drawerClose" aria-label="Close cart">✕</button></div>
+  <div class="drawer-items" id="cartItems"></div>
+  <div class="drawer-foot">
+    <div class="row"><span>Subtotal</span><strong id="cartSubtotal">R 0</strong></div>
+    <div class="row"><span>Delivery</span><strong id="cartDelivery">—</strong></div>
+    <div class="row total"><span>Total</span><strong id="cartTotal">R 0</strong></div>
+    <p class="muted small" id="deliveryHint"></p>
+    <form id="checkoutForm">
+      <input required name="name" placeholder="Your name">
+      <input required name="phone" placeholder="Phone / WhatsApp number">
+      <input name="address" placeholder="Delivery address (optional)">
+      <button class="btn btn-primary full" type="submit">Place order →</button>
+    </form>
+    <p class="muted small">We'll confirm your order, stock and payment details with you directly.</p>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+<button class="float-fb" id="floatFb" aria-label="Chat on Facebook">💬</button>
+
+<script src="app.js"></script>
+</body>
+</html>
