@@ -5,28 +5,32 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCart } from "@/context/cart-context";
 import { money } from "@/lib/utils";
-import type { Product } from "@/lib/products";
+import { availableSizes, totalPairs, type Product } from "@/lib/products";
+
+const CAT_LABEL: Record<Product["cat"], string> = { matte: "Matte", glossy: "Glossy", statement: "Statement", "red-bottom": "Red Bottom" };
 
 export function ProductCard({ product, onQuick }: { product: Product; onQuick: (p: Product) => void }) {
   const { add } = useCart();
-  const discount = product.was ? Math.round((1 - product.price / product.was) * 100) : 0;
+  const pairs = totalPairs(product);
+  const sizes = availableSizes(product);
   return (
     <Card className="group flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10">
       <div className="relative cursor-pointer" onClick={() => onQuick(product)}>
-        <Image src={product.img} alt={product.name} width={700} height={460} className="h-[230px] w-full object-cover max-sm:h-40" />
-        {product.badge === "sale" && <Badge className="absolute left-3 top-3">Sale −{discount}%</Badge>}
-        {product.badge === "new" && <Badge variant="new" className="absolute left-3 top-3">New</Badge>}
+        <Image src={product.img} alt={product.name} width={700} height={860} className="h-[280px] w-full object-cover max-sm:h-52" />
+        {pairs <= 5 && <Badge className="absolute left-3 top-3">Only {pairs} left</Badge>}
+        {product.cat === "red-bottom" && <Badge variant="new" className="absolute right-3 top-3">Red Bottom</Badge>}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">{product.cat}</span>
-        <h3 className="font-display cursor-pointer text-lg font-semibold hover:text-rose-500" onClick={() => onQuick(product)}>{product.name}</h3>
-        <div className="mt-auto flex items-baseline gap-2 pt-1">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">{CAT_LABEL[product.cat]} · {product.color}</span>
+        <h3 className="font-display cursor-pointer text-lg font-semibold leading-snug hover:text-rose-500" onClick={() => onQuick(product)}>{product.name}</h3>
+        <p className="text-xs text-stone-500">EU {sizes[0]}–{sizes[sizes.length - 1]} · {pairs} pairs in stock · {product.sku}</p>
+        <div className="mt-auto flex items-baseline gap-2 pt-2">
           <strong className="text-lg text-rose-600">{money(product.price)}</strong>
-          {product.was && <s className="text-sm text-stone-400">{money(product.was)}</s>}
+          <span className="text-xs text-stone-400">ZMW</span>
         </div>
         <div className="mt-2 flex gap-2">
           <Button size="sm" className="flex-1" onClick={() => add(product)}>Add to bag</Button>
-          <Button size="sm" variant="secondary" onClick={() => onQuick(product)}>View</Button>
+          <Button size="sm" variant="secondary" onClick={() => onQuick(product)}>Sizes</Button>
         </div>
       </div>
     </Card>

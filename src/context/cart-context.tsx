@@ -6,6 +6,7 @@ import type { Product } from "@/lib/products";
 export interface CartItem {
   key: string;
   id: number;
+  sku: string;
   name: string;
   price: number;
   img: string;
@@ -43,14 +44,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items]);
 
   const add = useCallback((p: Product, size?: number) => {
-    const s = size ?? p.sizes[Math.floor(p.sizes.length / 2)];
+    const sizes = Object.keys(p.stock).map(Number).sort((a, b) => a - b);
+    const s = size ?? sizes[Math.floor(sizes.length / 2)];
     const key = `${p.id}-${s}`;
     setItems((prev) => {
       const found = prev.find((i) => i.key === key);
       if (found) return prev.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { key, id: p.id, name: p.name, price: p.price, img: p.img, size: s, qty: 1 }];
+      return [...prev, { key, id: p.id, sku: p.sku, name: p.name, price: p.price, img: p.img, size: s, qty: 1 }];
     });
-    toast.success(`Added ${p.name} (UK ${s}) to your bag 🌸`);
+    toast.success(`Added ${p.name} (EU ${s}) to your bag 🌸`);
   }, []);
 
   const inc = useCallback((key: string) => setItems((p) => p.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i))), []);
