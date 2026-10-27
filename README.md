@@ -45,6 +45,25 @@ If you publish a stock-take sheet instead — one row per size with columns like
 - **Overrides** — optional `NAME`, `PRICE`, `CATEGORY`, `PHOTO`, `DESCRIPTION` and `ACTIVE` columns override the catalogue for that `MODEL` (first non-empty value wins). `ACTIVE=FALSE` hides the style.
 - **Not on the sheet** — catalogue styles with no rows on the sheet are hidden (the sheet is the stock truth).
 
+## Stock admin (`/admin`) — mark sold from the site
+
+A passcode-protected page at `/admin` lists every style with per-size counts and `−`/`+` buttons: `−` marks one pair sold, `+` restocks. Writes go through a small Google Apps Script you deploy once on your spreadsheet — the published CSV is read-only, so the script is the write path. Changes reach the storefront within seconds.
+
+### One-time setup (in your Google account)
+
+1. Open your inventory spreadsheet → **Extensions → Apps Script**. Replace the editor contents with `scripts/stock_writer.gs` from this repo and save.
+2. **Project Settings (⚙) → Script Properties → Add script property**: name `STOCK_TOKEN`, value = any long random string (keep it — you'll use it twice).
+3. **Deploy → New deployment** → type **Web app** → **Execute as: Me** → **Who has access: Anyone** → **Deploy**. Authorize when prompted. Copy the **Web app URL** (ends in `/exec`).
+4. Set environment variables (locally in `.env.local` and in Vercel):
+   - `ADMIN_PASSCODE` — the password you sign in with at `/admin`
+   - `STOCK_WRITER_URL` — the `/exec` URL from step 3
+   - `STOCK_WRITER_TOKEN` — the same `STOCK_TOKEN` value from step 2
+5. Redeploy/restart, then open `/admin`.
+
+The script supports both sheet layouts: your stock-take format (`MODEL`/`SIZE`/`COUNT` rows — it updates the matching row's `COUNT`, or appends a row when restocking a size that never had one) and the catalogue format (`stock_35`…`stock_45` columns).
+
+To change the passcode or token later: update the env vars and redeploy (the script keeps running — `STOCK_TOKEN` must match `STOCK_WRITER_TOKEN`).
+
 ## Deploy (Vercel)
 
 1. Push this repo to GitHub (already at `OrisonWorks/PetalStepsTM`).

@@ -1,0 +1,116 @@
+/**
+ * Petal Steps — stock writer endpoint.
+ *
+ * Deploy once on the shop's Google Sheet:
+ *   1. Extensions → Apps Script → paste this file.
+ *   2. Project Settings (gear) → Script Properties → add:
+ *        STOCK_TOKEN = <any long random string>   (same value as STOCK_WRITER_TOKEN env)
+ *   3. Deploy → New deployment → type "Web app" → Execute as: Me →
+ *      Who has access: Anyone → Deploy. Copy the /exec URL into
+ *      STOCK_WRITER_URL.
+ *
+ * POST JSON body: { token, model, size, set? , delta? }
+ *   - `set` writes an absolute count; otherwise `delta` (default -1) is applied,
+ *     clamped at 0.
+ * Stock-take layout (one row per size): finds the row matching MODEL+SIZE and
+ * updates COUNT. Restocking a size with no row appends one.
+ * Catalogue layout (one row per sku): updates the stock_<size> column.
+ */
+function doPost(e) {
+  const out = (o) =>
+    ContentService.createTextOutput(JSON.stringify(o)).setMimeType(
+      ContentService.MimeType.JSON
+    );
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+    const token = PropertiesService.getScriptProperties().getProperty(
+      "STOCK_TOKEN"
+    );
+    if (!token || body.token !== token)
+      return out({ ok: false, error: "unauthorized" });
+
+    const model = String(body.model || "").trim();
+    const size = parseInt(body.size, 10);
+    if (!model || !size)
+      return out({ ok: false, error: "model and size required" });
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map((h) =>
+      String(h).trim().toLowerCase().replace(/\s+/g, "_")
+    );
+    const modelCol =
+      headers.indexOf("model") >= 0
+        ? headers.indexOf("model")
+        : headers.indexOf("sku");
+    const sizeCol = headers.indexOf("size");
+    const countCol =
+      headers.indexOf("count") >= 0
+        ? headers.indexOf("count")
+        : headers.indexOf("qty");
+    const colorCol = headers.indexOf("color");
+
+    let rowIdx = -1;
+    let colIdx = -1;
+    if (modelCol >= 0 && sizeCol >= 0 && countCol >= 0) {
+      // stock-take layout
+      for (let i = 1; i < data.length; i++) {
+        if (
+          String(data[i][modelCol]).trim() === model &&
+          parseInt(data[i][sizeCol], 10) === size
+        ) {
+          rowIdx = i;
+          break;
+        }
+      }
+      colIdx = countCol;
+      if (rowIdx < 0) {
+        // size never stocked: append a row so restock works
+        const applySet =
+          body.set != null
+            ? Math.max(0, parseInt(body.set, 10) || 0)
+            : Math.max(0, body.delta || -1);
+        if (applySet <= 0)
+          return out({ ok: false, error: "row not found", model, size });
+        const newRow = new Array(data[0].length).fill("");
+        if (colorCol >= 0) newRow[colorCol] = "";
+        newRow[sizeCol] = size;
+        newRow[countCol] = applySet;
+        newRow[modelCol] = model;
+        sheet.appendRow(newRow);
+        return out({
+          ok: true,
+          model,
+          size,
+          previous: 0,
+          count: applySet,
+          appended: true,
+        });
+      }
+    } else if (modelCol >= 0) {
+      // catalogue layout
+      colIdx = headers.indexOf("stock_" + size);
+      if (colIdx < 0)
+        return out({ ok: false, error: "no stock_" + size + " column" });
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][modelCol]).trim() === model) {
+          rowIdx = i;
+          break;
+        }
+      }
+    } else {
+      return out({ ok: false, error: "unrecognized sheet layout" });
+    }
+    if (rowIdx < 0) return out({ ok: false, error: "row not found", model, size });
+
+    const current = parseInt(data[rowIdx][colIdx], 10) || 0;
+    const next =
+      body.set != null
+        ? Math.max(0, parseInt(body.set, 10) || 0)
+        : Math.max(0, current + (body.delta || -1));
+    sheet.getRange(rowIdx + 1, colIdx + 1).setValue(next);
+    return out({ ok: true, model, size, previous: current, count: next });
+  } catch (err) {
+    return out({ ok: false, error: String(err) });
+  }
+}
