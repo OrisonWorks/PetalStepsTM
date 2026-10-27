@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [busyKey, setBusyKey] = useState("");
 
   const loadProducts = useCallback(async () => {
-    const res = await fetch("/api/products", { cache: "no-store" });
+    const res = await fetch("/api/products?all=1", { cache: "no-store" });
     const data = await res.json();
     setProducts(data.products || []);
     setSource(data.source || "");

@@ -12,9 +12,11 @@
  * POST JSON body: { token, model, size, set? , delta? }
  *   - `set` writes an absolute count; otherwise `delta` (default -1) is applied,
  *     clamped at 0.
- * Stock-take layout (one row per size): finds the row matching MODEL+SIZE and
- * updates COUNT. Restocking a size with no row appends one.
+ * Stock-take layout (one row per size): finds every row matching MODEL+SIZE,
+ * treats the summed COUNT as the live count, writes the new count to the first
+ * row and zeroes duplicates. Restocking a size with no row appends one.
  * Catalogue layout (one row per sku): updates the stock_<size> column.
+ * A script lock serializes writes so overlapping sales can't lose updates.
  */
 function doPost(e) {
   const out = (o) =>
@@ -34,82 +36,89 @@ function doPost(e) {
     if (!model || !size)
       return out({ ok: false, error: "model and size required" });
 
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0].map((h) =>
-      String(h).trim().toLowerCase().replace(/\s+/g, "_")
-    );
-    const modelCol =
-      headers.indexOf("model") >= 0
-        ? headers.indexOf("model")
-        : headers.indexOf("sku");
-    const sizeCol = headers.indexOf("size");
-    const countCol =
-      headers.indexOf("count") >= 0
-        ? headers.indexOf("count")
-        : headers.indexOf("qty");
-    const colorCol = headers.indexOf("color");
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+    try {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0].map((h) =>
+        String(h).trim().toLowerCase().replace(/\s+/g, "_")
+      );
+      const modelCol =
+        headers.indexOf("model") >= 0
+          ? headers.indexOf("model")
+          : headers.indexOf("sku");
+      const sizeCol = headers.indexOf("size");
+      const countCol =
+        headers.indexOf("count") >= 0
+          ? headers.indexOf("count")
+          : headers.indexOf("qty");
+      const colorCol = headers.indexOf("color");
 
-    let rowIdx = -1;
-    let colIdx = -1;
-    if (modelCol >= 0 && sizeCol >= 0 && countCol >= 0) {
-      // stock-take layout
-      for (let i = 1; i < data.length; i++) {
-        if (
-          String(data[i][modelCol]).trim() === model &&
-          parseInt(data[i][sizeCol], 10) === size
-        ) {
-          rowIdx = i;
-          break;
+      const rowIdxs = [];
+      let colIdx = -1;
+      if (modelCol >= 0 && sizeCol >= 0 && countCol >= 0) {
+        // stock-take layout
+        for (let i = 1; i < data.length; i++) {
+          if (
+            String(data[i][modelCol]).trim() === model &&
+            parseInt(data[i][sizeCol], 10) === size
+          )
+            rowIdxs.push(i);
         }
-      }
-      colIdx = countCol;
-      if (rowIdx < 0) {
-        // size never stocked: append a row so restock works
-        const applySet =
-          body.set != null
-            ? Math.max(0, parseInt(body.set, 10) || 0)
-            : Math.max(0, body.delta || -1);
-        if (applySet <= 0)
-          return out({ ok: false, error: "row not found", model, size });
-        const newRow = new Array(data[0].length).fill("");
-        if (colorCol >= 0) newRow[colorCol] = "";
-        newRow[sizeCol] = size;
-        newRow[countCol] = applySet;
-        newRow[modelCol] = model;
-        sheet.appendRow(newRow);
-        return out({
-          ok: true,
-          model,
-          size,
-          previous: 0,
-          count: applySet,
-          appended: true,
-        });
-      }
-    } else if (modelCol >= 0) {
-      // catalogue layout
-      colIdx = headers.indexOf("stock_" + size);
-      if (colIdx < 0)
-        return out({ ok: false, error: "no stock_" + size + " column" });
-      for (let i = 1; i < data.length; i++) {
-        if (String(data[i][modelCol]).trim() === model) {
-          rowIdx = i;
-          break;
+        colIdx = countCol;
+        if (rowIdxs.length === 0) {
+          // size never stocked: append a row so restock works
+          const applySet =
+            body.set != null
+              ? Math.max(0, parseInt(body.set, 10) || 0)
+              : Math.max(0, body.delta || -1);
+          if (applySet <= 0)
+            return out({ ok: false, error: "row not found", model, size });
+          const newRow = new Array(data[0].length).fill("");
+          if (colorCol >= 0) newRow[colorCol] = "";
+          newRow[sizeCol] = size;
+          newRow[countCol] = applySet;
+          newRow[modelCol] = model;
+          sheet.appendRow(newRow);
+          return out({
+            ok: true,
+            model,
+            size,
+            previous: 0,
+            count: applySet,
+            appended: true,
+          });
         }
+      } else if (modelCol >= 0) {
+        // catalogue layout
+        colIdx = headers.indexOf("stock_" + size);
+        if (colIdx < 0)
+          return out({ ok: false, error: "no stock_" + size + " column" });
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][modelCol]).trim() === model) rowIdxs.push(i);
+        }
+      } else {
+        return out({ ok: false, error: "unrecognized sheet layout" });
       }
-    } else {
-      return out({ ok: false, error: "unrecognized sheet layout" });
+      if (rowIdxs.length === 0)
+        return out({ ok: false, error: "row not found", model, size });
+
+      const current = rowIdxs.reduce(
+        (sum, i) => sum + (parseInt(data[i][colIdx], 10) || 0),
+        0
+      );
+      const next =
+        body.set != null
+          ? Math.max(0, parseInt(body.set, 10) || 0)
+          : Math.max(0, current + (body.delta || -1));
+      sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
+      for (let k = 1; k < rowIdxs.length; k++)
+        sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
+      return out({ ok: true, model, size, previous: current, count: next });
+    } finally {
+      lock.releaseLock();
     }
-    if (rowIdx < 0) return out({ ok: false, error: "row not found", model, size });
-
-    const current = parseInt(data[rowIdx][colIdx], 10) || 0;
-    const next =
-      body.set != null
-        ? Math.max(0, parseInt(body.set, 10) || 0)
-        : Math.max(0, current + (body.delta || -1));
-    sheet.getRange(rowIdx + 1, colIdx + 1).setValue(next);
-    return out({ ok: true, model, size, previous: current, count: next });
   } catch (err) {
     return out({ ok: false, error: String(err) });
   }

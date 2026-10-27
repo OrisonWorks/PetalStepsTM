@@ -54,12 +54,15 @@ function toImage(raw: string): string {
   return raw.startsWith("http") || raw.startsWith("/") ? raw : `/products/${raw}`;
 }
 
-export function rowsToProducts(rows: Record<string, string>[]): Product[] {
+export function rowsToProducts(
+  rows: Record<string, string>[],
+  includeEmpty = false
+): Product[] {
   const keys = new Set(Object.keys(rows[0] ?? {}));
   if (keys.has("model") && keys.has("size") && keys.has("count")) {
-    return stockTakeToProducts(rows);
+    return stockTakeToProducts(rows, includeEmpty);
   }
-  return catalogueRowsToProducts(rows);
+  return catalogueRowsToProducts(rows, includeEmpty);
 }
 
 // Stock-take layout: one row per size — columns like `COLOR,SIZE,COUNT,MODEL`
@@ -68,8 +71,8 @@ export function rowsToProducts(rows: Record<string, string>[]): Product[] {
 // skus. Optional sheet columns — name, price, category, photo, description,
 // color, active — override the catalogue when present and non-empty. Models
 // with no usable name+price (not in the catalogue and no overrides) or with
-// zero stock are skipped.
-function stockTakeToProducts(rows: Record<string, string>[]): Product[] {
+// zero stock are skipped unless includeEmpty is set (admin restock view).
+function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = false): Product[] {
   const bySku = new Map(PRODUCTS.map((p) => [p.sku, p]));
   const groups = new Map<string, Record<string, string>[]>();
   for (const r of rows) {
@@ -88,7 +91,7 @@ function stockTakeToProducts(rows: Record<string, string>[]): Product[] {
       const count = parseInt((r.count || r.qty || r.stock || "0").replace(/[^0-9]/g, ""), 10);
       if (size >= 35 && size <= 45 && count > 0) stock[size] = (stock[size] ?? 0) + count;
     }
-    if (Object.keys(stock).length === 0) continue;
+    if (!includeEmpty && Object.keys(stock).length === 0) continue;
     const base = bySku.get(model);
     const name = firstInGroup(rs, "name") || base?.name || "";
     const price = parseInt((firstInGroup(rs, "price") || (base ? String(base.price) : "")).replace(/[^0-9]/g, ""), 10);
@@ -115,7 +118,7 @@ function stockTakeToProducts(rows: Record<string, string>[]): Product[] {
   return products;
 }
 
-function catalogueRowsToProducts(rows: Record<string, string>[]): Product[] {
+function catalogueRowsToProducts(rows: Record<string, string>[], includeEmpty = false): Product[] {
   const products: Product[] = [];
   for (const r of rows) {
     if (isInactive(r.active)) continue;
@@ -128,7 +131,7 @@ function catalogueRowsToProducts(rows: Record<string, string>[]): Product[] {
       const v = parseInt(r[`stock_${s}`] || r[`eu_${s}`] || r[`size_${s}`] || "0", 10);
       if (v > 0) stock[s] = v;
     }
-    if (Object.keys(stock).length === 0) continue;
+    if (!includeEmpty && Object.keys(stock).length === 0) continue;
     const catRaw = (r.category || r.cat || "matte").toLowerCase().replace(/\s+/g, "-") as Category;
     const img = toImage(r.photo || r.image || r.img || "") || "/products/image1.jpg";
     products.push({
@@ -146,13 +149,15 @@ function catalogueRowsToProducts(rows: Record<string, string>[]): Product[] {
   return products;
 }
 
-export async function getProducts(): Promise<{ products: Product[]; source: "sheet" | "fallback" }> {
+export async function getProducts(
+  includeEmpty = false
+): Promise<{ products: Product[]; source: "sheet" | "fallback" }> {
   const url = process.env.PRODUCTS_SHEET_CSV_URL;
   if (!url) return { products: PRODUCTS, source: "fallback" };
   try {
     const res = await fetch(url, { next: { revalidate: 300, tags: ["products"] } });
     if (!res.ok) throw new Error(`Sheet fetch ${res.status}`);
-    const products = rowsToProducts(parseCsv(await res.text()));
+    const products = rowsToProducts(parseCsv(await res.text()), includeEmpty);
     if (products.length === 0) throw new Error("Sheet returned no valid products");
     return { products, source: "sheet" };
   } catch (err) {
