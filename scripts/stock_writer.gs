@@ -16,7 +16,9 @@
  * treats the summed COUNT as the live count, writes the new count to the first
  * row and zeroes duplicates. Restocking a size with no row appends one.
  * Catalogue layout (one row per sku): updates the stock_<size> column.
- * A script lock serializes writes so overlapping sales can't lose updates.
+ * A script lock serializes writes so overlapping sales can't lose updates;
+ * SpreadsheetApp.flush() before releasing the lock ensures the write is
+ * committed before the next writer reads.
  */
 function doPost(e) {
   const out = (o) =>
@@ -117,6 +119,7 @@ function doPost(e) {
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
+      SpreadsheetApp.flush();
       lock.releaseLock();
     }
   } catch (err) {
