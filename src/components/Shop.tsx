@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductCard } from "@/components/ProductCard";
-import { PRODUCTS, totalPairs, type Filter, type Product } from "@/lib/products";
+import { totalPairs, type Filter, type Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: Filter; label: string }[] = [
@@ -16,13 +16,14 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "low", label: "Almost gone" },
 ];
 
-export function Shop({ filter, setFilter, search, sort, setSort, onQuick }: {
-  filter: Filter; setFilter: (f: Filter) => void; search: string;
+export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick }: {
+  products: Product[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
   sort: string; setSort: (v: string) => void; onQuick: (p: Product) => void;
 }) {
+  const totalPairsAll = products.reduce((a, p) => a + totalPairs(p), 0);
   const list = useMemo(() => {
     const q = search.toLowerCase();
-    const filtered = PRODUCTS.filter((p) =>
+    const filtered = products.filter((p) =>
       (filter === "all" || p.cat === filter || (filter === "low" && totalPairs(p) <= 5)) &&
       (`${p.name} ${p.color} ${p.sku}`.toLowerCase().includes(q))
     );
@@ -30,14 +31,14 @@ export function Shop({ filter, setFilter, search, sort, setSort, onQuick }: {
     if (sort === "high") filtered.sort((a, b) => b.price - a.price);
     if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
     return filtered;
-  }, [filter, search, sort]);
+  }, [products, filter, search, sort]);
 
   return (
     <section id="shop" className="mx-auto w-[min(1180px,92%)] pb-16">
       <div className="mx-auto mb-8 max-w-xl text-center">
         <Badge variant="soft" className="mb-3">The heels collection · Lusaka</Badge>
         <h2 className="font-display text-4xl font-semibold">Shop Petal Steps</h2>
-        <p className="mt-2 text-stone-500">29 styles · 247 pairs · K450–K650. Tap a heel to see EU sizes in stock, then add it to your bag.</p>
+        <p className="mt-2 text-stone-500">{products.length} styles · {totalPairsAll} pairs · K450–K650. Tap a heel to see EU sizes in stock, then add it to your bag.</p>
       </div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">

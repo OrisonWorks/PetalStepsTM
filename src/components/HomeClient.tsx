@@ -1,0 +1,41 @@
+"use client";
+import { useCallback, useState } from "react";
+import { CartDrawer } from "@/components/CartDrawer";
+import { Header } from "@/components/Header";
+import { QuickView } from "@/components/QuickView";
+import { Categories, Contact, Footer, Hero, Marquee, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
+import { Shop } from "@/components/Shop";
+import { totalPairs, type Filter, type Product } from "@/lib/products";
+
+export function HomeClient({ products }: { products: Product[] }) {
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("featured");
+  const [quick, setQuick] = useState<Product | null>(null);
+  const pairs = products.reduce((a, p) => a + totalPairs(p), 0);
+
+  const goFilter = useCallback((f: Filter) => {
+    setFilter(f);
+    document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  return (
+    <>
+      <Header search={search} setSearch={setSearch} />
+      <main>
+        <Hero styles={products.length} pairs={pairs} />
+        <Marquee />
+        <Categories onSelect={goFilter} />
+        <Shop products={products} filter={filter} setFilter={setFilter} search={search} sort={sort} setSort={setSort} onQuick={setQuick} />
+        <SaleBanner onSelect={goFilter} />
+        <WhyUs />
+        <Reviews />
+        <Contact />
+        <Newsletter />
+      </main>
+      <Footer />
+      <QuickView product={quick} onClose={() => setQuick(null)} />
+      <CartDrawer />
+    </>
+  );
+}

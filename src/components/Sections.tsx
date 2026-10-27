@@ -18,7 +18,7 @@ const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
   { filter: "red-bottom", label: "Red Bottom", sub: "Signature red sole · K650", img: "/products/image25.jpg" },
 ];
 
-export function Hero() {
+export function Hero({ styles = 29, pairs = 247 }: { styles?: number; pairs?: number }) {
   return (
     <section id="top" className="bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
       <div className="mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
@@ -26,13 +26,13 @@ export function Hero() {
           <p className="font-script text-5xl leading-none text-stone-900">Petal Steps</p>
           <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.35em] text-stone-500">By Thandiwe Mwaba</p>
           <h1 className="font-display mt-5 text-5xl font-semibold leading-[1.05] sm:text-6xl">Women&apos;s heels that <span className="italic text-rose-500">bloom</span> with every step.</h1>
-          <p className="mt-5 max-w-lg text-lg text-stone-600">29 heel styles in stock in Lusaka — matte, glossy, statement florals and signature red bottoms. EU 35–45, K450–K650. What you see is what&apos;s actually on the shelf.</p>
+          <p className="mt-5 max-w-lg text-lg text-stone-600">{styles} heel styles in stock in Lusaka — matte, glossy, statement florals and signature red bottoms. EU 35–45, K450–K650. What you see is what&apos;s actually on the shelf.</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button size="lg" asChild><a href="#shop">Shop heels — K450–K650</a></Button>
             <Button size="lg" variant="outline" asChild><a href={waLink("Hi Petal Steps by Thandiwe Mwaba! I'd like to check heel availability.")} target="_blank" rel="noreferrer">WhatsApp {WA_DISPLAY}</a></Button>
           </div>
           <div className="mt-9 flex gap-8">
-            {[["29", "Styles in stock"], ["247", "Pairs available"], ["EU 35–45", "Sizes"]].map(([n, l]) => (
+            {[[String(styles), "Styles in stock"], [String(pairs), "Pairs available"], ["EU 35–45", "Sizes"]].map(([n, l]) => (
               <div key={l}><strong className="font-display block text-2xl">{n}</strong><span className="text-xs text-stone-500">{l}</span></div>
             ))}
           </div>
