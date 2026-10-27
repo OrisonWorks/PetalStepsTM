@@ -36,6 +36,15 @@ Edit the Google Sheet — changes appear on the website within ~5 minutes:
 
 Keep the header row exactly as-is — the website matches columns by name.
 
+### Alternative: your stock-take sheet also works
+
+If you publish a stock-take sheet instead — one row per size with columns like `COLOR,SIZE,COUNT,MODEL` — the site reads live stock from it and fills in name, price, photo and description from the built-in catalogue by matching `MODEL` to `sku`. Handy when your existing stock sheet is the thing you update every day:
+
+- **Update stock** — edit `COUNT` for the size row; set to `0` when a size sells out.
+- **New style** — a `MODEL` that isn't in the site catalogue is skipped until it gets a name and price. Add `NAME` and `PRICE` columns to the sheet to sell it immediately, or ask your developer to add it to the catalogue (photos live in the repo).
+- **Overrides** — optional `NAME`, `PRICE`, `CATEGORY`, `PHOTO`, `DESCRIPTION` and `ACTIVE` columns override the catalogue for that `MODEL` (first non-empty value wins). `ACTIVE=FALSE` hides the style.
+- **Not on the sheet** — catalogue styles with no rows on the sheet are hidden (the sheet is the stock truth).
+
 ## Deploy (Vercel)
 
 1. Push this repo to GitHub (already at `OrisonWorks/PetalStepsTM`).

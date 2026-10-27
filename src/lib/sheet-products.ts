@@ -35,11 +35,90 @@ export function parseCsv(text: string): Record<string, string>[] {
   });
 }
 
+const INACTIVE = ["false", "no", "0", "hide", "hidden"];
+
+function isInactive(value: string | undefined): boolean {
+  return INACTIVE.includes((value ?? "TRUE").trim().toLowerCase());
+}
+
+function firstInGroup(rows: Record<string, string>[], key: string): string {
+  for (const r of rows) {
+    const v = (r[key] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
+function toImage(raw: string): string {
+  if (!raw) return "";
+  return raw.startsWith("http") || raw.startsWith("/") ? raw : `/products/${raw}`;
+}
+
 export function rowsToProducts(rows: Record<string, string>[]): Product[] {
+  const keys = new Set(Object.keys(rows[0] ?? {}));
+  if (keys.has("model") && keys.has("size") && keys.has("count")) {
+    return stockTakeToProducts(rows);
+  }
+  return catalogueRowsToProducts(rows);
+}
+
+// Stock-take layout: one row per size — columns like `COLOR,SIZE,COUNT,MODEL`
+// (SIZE and COUNT/EU also accepted). Stock per size comes from the sheet; the
+// built-in catalogue fills in name/price/photo/description for known MODEL
+// skus. Optional sheet columns — name, price, category, photo, description,
+// color, active — override the catalogue when present and non-empty. Models
+// with no usable name+price (not in the catalogue and no overrides) or with
+// zero stock are skipped.
+function stockTakeToProducts(rows: Record<string, string>[]): Product[] {
+  const bySku = new Map(PRODUCTS.map((p) => [p.sku, p]));
+  const groups = new Map<string, Record<string, string>[]>();
+  for (const r of rows) {
+    const model = (r.model || r.sku || "").trim();
+    if (!model || model.toUpperCase() === "TOTAL") continue;
+    let g = groups.get(model);
+    if (!g) groups.set(model, (g = []));
+    g.push(r);
+  }
+  const products: Product[] = [];
+  for (const [model, rs] of groups) {
+    if (isInactive(firstInGroup(rs, "active"))) continue;
+    const stock: Record<number, number> = {};
+    for (const r of rs) {
+      const size = parseInt((r.size || "").replace(/[^0-9]/g, ""), 10);
+      const count = parseInt((r.count || r.qty || r.stock || "0").replace(/[^0-9]/g, ""), 10);
+      if (size >= 35 && size <= 45 && count > 0) stock[size] = (stock[size] ?? 0) + count;
+    }
+    if (Object.keys(stock).length === 0) continue;
+    const base = bySku.get(model);
+    const name = firstInGroup(rs, "name") || base?.name || "";
+    const price = parseInt((firstInGroup(rs, "price") || (base ? String(base.price) : "")).replace(/[^0-9]/g, ""), 10);
+    if (!name || !price) {
+      console.warn(`Sheet model ${model} skipped: no name/price in sheet or catalogue`);
+      continue;
+    }
+    const catRaw = (firstInGroup(rs, "category") || firstInGroup(rs, "cat") || base?.cat || "matte")
+      .toLowerCase().replace(/\s+/g, "-") as Category;
+    const img = toImage(firstInGroup(rs, "photo") || firstInGroup(rs, "image") || firstInGroup(rs, "img"))
+      || base?.img || "/products/image1.jpg";
+    products.push({
+      id: products.length + 1,
+      sku: model,
+      name,
+      color: base?.color || firstInGroup(rs, "color") || firstInGroup(rs, "colour") || "",
+      cat: CATEGORIES.includes(catRaw) ? catRaw : "matte",
+      price,
+      img,
+      desc: firstInGroup(rs, "description") || firstInGroup(rs, "desc") || base?.desc || "",
+      stock,
+    });
+  }
+  return products;
+}
+
+function catalogueRowsToProducts(rows: Record<string, string>[]): Product[] {
   const products: Product[] = [];
   for (const r of rows) {
-    const activeRaw = (r.active ?? "TRUE").toLowerCase();
-    if (["false", "no", "0", "hide", "hidden"].includes(activeRaw)) continue;
+    if (isInactive(r.active)) continue;
     const sku = r.sku || r.model || "";
     const name = r.name || "";
     const price = parseInt((r.price || "").replace(/[^0-9]/g, ""), 10);
@@ -51,12 +130,7 @@ export function rowsToProducts(rows: Record<string, string>[]): Product[] {
     }
     if (Object.keys(stock).length === 0) continue;
     const catRaw = (r.category || r.cat || "matte").toLowerCase().replace(/\s+/g, "-") as Category;
-    const photoRaw = r.photo || r.image || r.img || "";
-    const img = !photoRaw
-      ? "/products/image1.jpg"
-      : photoRaw.startsWith("http") || photoRaw.startsWith("/")
-        ? photoRaw
-        : `/products/${photoRaw}`;
+    const img = toImage(r.photo || r.image || r.img || "") || "/products/image1.jpg";
     products.push({
       id: products.length + 1,
       sku,
