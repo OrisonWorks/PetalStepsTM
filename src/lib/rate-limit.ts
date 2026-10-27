@@ -7,11 +7,13 @@ const MAX_FAILURES = 10;
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function key(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  // x-vercel-forwarded-for is set by the platform from observed connections and
+  // can't be spoofed by a client-supplied XFF. Otherwise take the rightmost XFF
+  // entry (the IP appended by the edge), never the client-controlled first one.
+  const vercel = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  if (vercel) return vercel;
+  const xff = req.headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
+  return xff?.[xff.length - 1] || req.headers.get("x-real-ip") || "unknown";
 }
 
 export function loginRateLimited(req: Request): boolean {
