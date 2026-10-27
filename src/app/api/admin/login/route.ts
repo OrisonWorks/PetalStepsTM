@@ -6,15 +6,15 @@ export async function POST(req: Request) {
   if (!adminConfigured()) {
     return NextResponse.json({ ok: false, error: "Admin not configured" }, { status: 503 });
   }
-  if (loginRateLimited(req)) {
+  if (loginRateLimited()) {
     return NextResponse.json({ ok: false, error: "Too many attempts — try again later" }, { status: 429 });
   }
   const { passcode } = await req.json().catch(() => ({ passcode: "" }));
   if (typeof passcode !== "string" || !passcodeValid(passcode)) {
-    recordLoginFailure(req);
+    recordLoginFailure();
     return NextResponse.json({ ok: false, error: "Wrong passcode" }, { status: 401 });
   }
-  clearLoginFailures(req);
+  clearLoginFailures();
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, expectedCookieValue(), {
     httpOnly: true,
