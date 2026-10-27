@@ -150,7 +150,7 @@ export async function getProducts(): Promise<{ products: Product[]; source: "she
   const url = process.env.PRODUCTS_SHEET_CSV_URL;
   if (!url) return { products: PRODUCTS, source: "fallback" };
   try {
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, { next: { revalidate: 300, tags: ["products"] } });
     if (!res.ok) throw new Error(`Sheet fetch ${res.status}`);
     const products = rowsToProducts(parseCsv(await res.text()));
     if (products.length === 0) throw new Error("Sheet returned no valid products");
