@@ -1,48 +1,46 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { Clock, Facebook, Footprints, MessageCircle, PiggyBank, RefreshCcw, Star, Truck } from "lucide-react";
+import { BadgeCheck, Clock, Facebook, MapPin, MessageCircle, PiggyBank, ShieldCheck, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PromoPlayer } from "@/components/PromoPlayer";
-import { FB_URL } from "@/lib/utils";
+import { FB_URL, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
 import type { Filter } from "@/lib/products";
 
 const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
-  { filter: "women", label: "Women", sub: "Heels, flats, sneakers & more", img: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=700&q=80&auto=format&fit=crop" },
-  { filter: "men", label: "Men", sub: "Sneakers, loafers & boots", img: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=700&q=80&auto=format&fit=crop" },
-  { filter: "kids", label: "Kids", sub: "Comfy, durable & fun", img: "https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=700&q=80&auto=format&fit=crop" },
-  { filter: "sale", label: "Sale", sub: "Up to 40% off selected pairs", img: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=700&q=80&auto=format&fit=crop" },
+  { filter: "matte", label: "Matte Heels", sub: "Soft finish · work, church & daily polish", img: "/products/image3.jpg" },
+  { filter: "glossy", label: "Glossy Heels", sub: "High shine · camel, nude, red & neon", img: "/products/image6.jpg" },
+  { filter: "statement", label: "Statement", sub: "Floral & two-tone show-stoppers", img: "/products/image21.jpg" },
+  { filter: "red-bottom", label: "Red Bottom", sub: "Signature red sole · K650", img: "/products/image25.jpg" },
 ];
 
 export function Hero() {
   return (
-    <section id="top" className="bg-gradient-to-br from-rose-50 via-white to-white py-14">
+    <section id="top" className="bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
       <div className="mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
         <div>
-          <Badge variant="soft" className="mb-4 normal-case tracking-normal">🌸 Petal Steps by TM</Badge>
-          <h1 className="font-display text-5xl font-semibold leading-[1.05] sm:text-6xl lg:text-7xl">
-            Every step<br /><span className="italic text-rose-500">blooms</span> with style.
-          </h1>
-          <p className="mt-5 max-w-lg text-lg text-stone-500">
-            Comfortable, head-turning footwear for women, men and kids — from everyday sneakers to occasion heels. Quality pairs, honest prices, delivered to your door.
-          </p>
+          <p className="font-script text-5xl leading-none text-stone-900">Petal Steps</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.35em] text-stone-500">By Thandiwe Mwaba</p>
+          <h1 className="font-display mt-5 text-5xl font-semibold leading-[1.05] sm:text-6xl">Women&apos;s heels that <span className="italic text-rose-500">bloom</span> with every step.</h1>
+          <p className="mt-5 max-w-lg text-lg text-stone-600">29 heel styles in stock in Lusaka — matte, glossy, statement florals and signature red bottoms. EU 35–45, K450–K650. What you see is what&apos;s actually on the shelf.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Button size="lg" asChild><a href="#shop">Shop the collection</a></Button>
-            <Button size="lg" variant="outline" asChild><a href="#categories">Browse categories</a></Button>
+            <Button size="lg" asChild><a href="#shop">Shop heels — K450–K650</a></Button>
+            <Button size="lg" variant="outline" asChild><a href={waLink("Hi Petal Steps by Thandiwe Mwaba! I'd like to check heel availability.")} target="_blank" rel="noreferrer">WhatsApp {WA_DISPLAY}</a></Button>
           </div>
           <div className="mt-9 flex gap-8">
-            {[["500+", "Happy customers"], ["120+", "Styles in store"], ["4.9★", "Average rating"]].map(([n, l]) => (
+            {[["29", "Styles in stock"], ["247", "Pairs available"], ["EU 35–45", "Sizes"]].map(([n, l]) => (
               <div key={l}><strong className="font-display block text-2xl">{n}</strong><span className="text-xs text-stone-500">{l}</span></div>
             ))}
           </div>
+          <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-stone-600"><MapPin className="h-4 w-4 text-rose-500" /> {SHOP_ADDRESS}</p>
         </div>
         <div>
           <PromoPlayer />
-          <p className="mt-3 text-center text-xs text-stone-400">▶ Our 10-second promo — made with Remotion. Render it for Facebook with <code>npm run remotion:render</code></p>
+          <p className="mt-3 text-center text-xs text-stone-500">Our heels, your next step. Order only on {WA_DISPLAY}.</p>
         </div>
       </div>
     </section>
@@ -50,7 +48,7 @@ export function Hero() {
 }
 
 export function Marquee() {
-  const text = "New arrivals weekly ✦ Free delivery over R800 ✦ Easy exchanges ✦ Women · Men · Kids ✦ ";
+  const text = "Women's heels K450–K650 ✦ EU 35–45 ✦ Lusaka: book Yango for collection ✦ Out of town: Platinum & Falcon courier ✦ Official number +260 760 732 751 ✦ ";
   return (
     <div className="overflow-hidden whitespace-nowrap bg-stone-900 py-2.5 text-sm font-semibold text-rose-200">
       <div className="animate-marquee inline-flex"><span className="pr-4">{text.repeat(2)}</span><span className="pr-4">{text.repeat(2)}</span></div>
@@ -62,7 +60,7 @@ export function Categories({ onSelect }: { onSelect: (f: Filter) => void }) {
   return (
     <section id="categories" className="mx-auto w-[min(1180px,92%)] py-16">
       <div className="mx-auto mb-8 max-w-xl text-center">
-        <Badge variant="soft" className="mb-3">Shop by category</Badge>
+        <Badge variant="soft" className="mb-3">Shop by finish</Badge>
         <h2 className="font-display text-4xl font-semibold">Find your perfect pair</h2>
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -80,24 +78,24 @@ export function Categories({ onSelect }: { onSelect: (f: Filter) => void }) {
 
 export function SaleBanner({ onSelect }: { onSelect: (f: Filter) => void }) {
   return (
-    <section className="bg-gradient-to-r from-rose-500 to-rose-400 py-12 text-white">
+    <section className="bg-gradient-to-r from-[#c084fc] via-rose-400 to-[#fda4af] py-12 text-white">
       <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap items-center justify-between gap-6">
         <div>
-          <Badge className="mb-3 bg-white/20 text-white">Limited time</Badge>
-          <h2 className="font-display text-4xl font-semibold">Up to 40% off selected styles</h2>
-          <p className="mt-1 text-rose-50">When they&apos;re gone, they&apos;re gone. Grab your size before it sells out.</p>
+          <Badge className="mb-3 bg-white/20 text-white">Grand opening · 24 October 2026 · 09:00–13:00</Badge>
+          <h2 className="font-display text-4xl font-semibold">Come celebrate with us in Thompson Park</h2>
+          <p className="mt-1 text-rose-50">{SHOP_ADDRESS}. Almost-gone styles have 5 pairs or fewer — grab your EU size before it sells out.</p>
         </div>
-        <Button variant="light" size="lg" onClick={() => onSelect("sale")}>Shop the sale</Button>
+        <Button variant="light" size="lg" onClick={() => onSelect("low")}>Shop almost-gone heels</Button>
       </div>
     </section>
   );
 }
 
 const WHY = [
-  { icon: Footprints, title: "All-day comfort", text: "Cushioned soles and breathable materials, chosen for real life — not just the photo." },
-  { icon: PiggyBank, title: "Honest prices", text: "Boutique look without the boutique mark-up. Regular sales and bundle deals." },
-  { icon: Truck, title: "Fast delivery", text: "Orders confirmed quickly and delivered to your door. Free delivery over R800." },
-  { icon: RefreshCcw, title: "Easy exchanges", text: "Wrong size? No stress — exchange for the right fit, hassle-free." },
+  { icon: BadgeCheck, title: "Real stock, real sizes", text: "Every style shows the EU sizes actually in stock and how many pairs are left. No guessing." },
+  { icon: PiggyBank, title: "Honest Kwacha prices", text: "All heels K450–K650. Kitten heels to signature red bottoms — the price is on the pair." },
+  { icon: Truck, title: "Lusaka & out-of-town delivery", text: "Lusaka: you book Yango for collection. Out of town: Platinum & Falcon courier or bus courier, cost confirmed after weighing." },
+  { icon: ShieldCheck, title: "Order safely", text: "Only order and pay via our official number +260 760 732 751. Confirm availability before payment and attach proof of payment." },
 ];
 
 export function WhyUs() {
@@ -105,7 +103,7 @@ export function WhyUs() {
     <section id="why" className="mx-auto w-[min(1180px,92%)] py-16">
       <div className="mx-auto mb-8 max-w-xl text-center">
         <Badge variant="soft" className="mb-3">Why Petal Steps</Badge>
-        <h2 className="font-display text-4xl font-semibold">Made to be walked in</h2>
+        <h2 className="font-display text-4xl font-semibold">Heels, honestly sold</h2>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {WHY.map((w) => (
@@ -121,9 +119,9 @@ export function WhyUs() {
 }
 
 const REVIEWS = [
-  { text: "My sneakers arrived so fast and they're even prettier in person. I wear them every day!", name: "Naledi M." },
-  { text: "Ordered heels for a wedding. Perfect fit, super comfortable, and I danced all night.", name: "Thandi K." },
-  { text: "Great service on Facebook — they helped me pick the right size for my daughter. Will buy again.", name: "Lerato S." },
+  { text: "The photos are the actual heels — my nude glossy pair looked exactly the same in person. EU sizing was spot on.", name: "Lusaka customer" },
+  { text: "Ordered on WhatsApp, confirmed my size, and sent a Yango rider the same afternoon. So easy.", name: "Lusaka customer" },
+  { text: "Red bottoms at K650? I checked the official number first, paid by mobile money and collected in Thompson Park.", name: "Lusaka customer" },
 ];
 
 export function Reviews() {
@@ -149,8 +147,8 @@ export function Reviews() {
 export function Contact() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    toast.success("Thanks! Opening Facebook — send your message there for the fastest reply 🌸");
-    setTimeout(() => window.open(FB_URL, "_blank"), 900);
+    toast.success("Opening WhatsApp — the only official Petal Steps number 🌸");
+    setTimeout(() => window.open(waLink("Hi Petal Steps by Thandiwe Mwaba! I have a question about your heels."), "_blank"), 900);
     (e.target as HTMLFormElement).reset();
   };
   return (
@@ -158,19 +156,24 @@ export function Contact() {
       <div className="grid items-start gap-10 lg:grid-cols-2">
         <div>
           <Badge variant="soft" className="mb-3">Get in touch</Badge>
-          <h2 className="font-display text-4xl font-semibold">Questions? Let&apos;s talk shoes.</h2>
-          <p className="mt-3 text-stone-500">Message us on Facebook for the fastest reply, stock checks and size advice. You can also place your order right here — we&apos;ll confirm it with you personally.</p>
+          <h2 className="font-display text-4xl font-semibold">Questions? Let&apos;s talk heels.</h2>
+          <p className="mt-3 text-stone-500">WhatsApp is fastest for stock checks and size advice. Please confirm availability before purchase, then attach proof of payment after you pay.</p>
           <ul className="mt-6 space-y-3 font-semibold">
-            <li className="flex items-center gap-2"><Facebook className="h-5 w-5 text-rose-500" /><a className="text-rose-600 underline" href={FB_URL} target="_blank" rel="noreferrer">Petal Steps by TM on Facebook</a></li>
-            <li className="flex items-center gap-2"><Clock className="h-5 w-5 text-rose-500" /> Mon–Sat · 9:00 – 18:00</li>
-            <li className="flex items-center gap-2"><Truck className="h-5 w-5 text-rose-500" /> Delivery available — free over R800</li>
+            <li className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-rose-500" /><a className="text-rose-600 underline" href={waLink("Hi Petal Steps by Thandiwe Mwaba!")} target="_blank" rel="noreferrer">WhatsApp / call {WA_DISPLAY} (official number only)</a></li>
+            <li className="flex items-center gap-2"><Facebook className="h-5 w-5 text-rose-500" /><a className="text-rose-600 underline" href={FB_URL} target="_blank" rel="noreferrer">Petal Steps by Thandiwe Mwaba on Facebook</a></li>
+            <li className="flex items-center gap-2"><MapPin className="h-5 w-5 text-rose-500" /> {SHOP_ADDRESS}</li>
+            <li className="flex items-center gap-2"><Clock className="h-5 w-5 text-rose-500" /> Yango booking: Mon–Fri 10:00–16:00 · Sat 09:00–13:00 · Sun closed</li>
+            <li className="flex items-center gap-2"><Truck className="h-5 w-5 text-rose-500" /> Pick up within 5 days, or K5/day storage applies</li>
           </ul>
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            {["/brand/order-payment.jpg", "/brand/delivery-lusaka.jpg", "/brand/delivery-out-of-town.jpg"].map((src) => <Image key={src} src={src} alt="Petal Steps order and delivery information" width={300} height={380} className="h-36 w-full rounded-xl object-cover object-top" />)}
+          </div>
         </div>
         <form onSubmit={submit} className="space-y-3 rounded-3xl border border-rose-100 bg-white p-6 shadow-xl shadow-rose-500/10">
           <label className="block text-sm font-semibold">Your name<Input required placeholder="e.g. Tumelo M." className="mt-1" /></label>
           <label className="block text-sm font-semibold">Phone / WhatsApp<Input required placeholder="e.g. 071 234 5678" className="mt-1" /></label>
-          <label className="block text-sm font-semibold">Message<textarea required rows={4} placeholder="Hi! Do you have the Bloom Runners in size 6?" className="mt-1 w-full rounded-xl border border-rose-200 px-4 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-200" /></label>
-          <Button type="submit" className="w-full">Send via Facebook →</Button>
+          <label className="block text-sm font-semibold">Message<textarea required rows={4} placeholder="Hi! Do you have the Pink Matte Stiletto in EU 39?" className="mt-1 w-full rounded-xl border border-rose-200 px-4 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-200" /></label>
+          <Button type="submit" className="w-full">Send via WhatsApp →</Button>
         </form>
       </div>
     </section>
@@ -184,7 +187,7 @@ export function Newsletter() {
       <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap items-center justify-between gap-6">
         <div>
           <h2 className="font-display text-3xl font-semibold">Join the Petal List 🌸</h2>
-          <p className="text-stone-500">First dibs on new drops, restocks and members-only specials.</p>
+          <p className="text-stone-500">First dibs on new heel drops, restocks and almost-gone sizes.</p>
         </div>
         <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); toast.success("Welcome to the Petal List 🌸 You're subscribed!"); setEmail(""); }}>
           <Input type="email" required placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} className="min-w-64 rounded-full" />
@@ -200,20 +203,21 @@ export function Footer() {
     <footer className="bg-stone-900 text-rose-100">
       <div className="mx-auto grid w-[min(1180px,92%)] gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="font-display text-xl font-bold text-white">🌸 Petal Steps <em className="text-base text-rose-400">by TM</em></p>
-          <p className="mt-2 max-w-xs text-sm text-rose-200/70">Footwear that blooms with every step. Women · Men · Kids.</p>
+          <p className="font-script text-3xl text-white">Petal Steps</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-rose-300">By Thandiwe Mwaba</p>
+          <p className="mt-2 max-w-xs text-sm text-rose-200/70">Women&apos;s heels that bloom with every step. Lusaka, Zambia.</p>
         </div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Shop</h4>{[["All shoes", "#shop"], ["Women", "#categories"], ["Men", "#categories"], ["Kids", "#categories"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["Delivery & exchanges", "#why"], ["Size advice", "#contact"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Follow us</h4><a href={FB_URL} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">Facebook</a></div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Shop</h4>{[["All heels", "#shop"], ["Matte", "#categories"], ["Glossy", "#categories"], ["Red Bottom", "#categories"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["How ordering works", "#why"], ["Delivery — Lusaka & out of town", "#contact"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Visit / follow</h4><p className="py-1 text-rose-200/80">{SHOP_ADDRESS}</p><a href={waLink("Hi Petal Steps by Thandiwe Mwaba!")} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">WhatsApp {WA_DISPLAY}</a><a href={FB_URL} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">Facebook</a></div>
       </div>
       <div className="border-t border-white/10">
         <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap justify-between gap-2 py-4 text-xs text-rose-200/60">
-          <span>© {new Date().getFullYear()} Petal Steps by TM. All rights reserved.</span>
-          <span>Prices in ZAR. Confirm stock &amp; final price when you order.</span>
+          <span>© {new Date().getFullYear()} Petal Steps by Thandiwe Mwaba. All rights reserved.</span>
+          <span>Prices in ZMW (K450–K650). Only order/pay via {WA_DISPLAY}.</span>
         </div>
       </div>
-      <a href={FB_URL} target="_blank" rel="noreferrer" aria-label="Chat on Facebook" className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-xl shadow-rose-500/30 transition hover:bg-rose-600">
+      <a href={waLink("Hi Petal Steps by Thandiwe Mwaba! I'd like to order heels.")} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp" className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl shadow-emerald-500/30 transition hover:bg-[#1eb85a]">
         <MessageCircle className="h-6 w-6" />
       </a>
     </footer>

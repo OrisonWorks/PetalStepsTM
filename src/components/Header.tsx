@@ -13,12 +13,12 @@ export function Header({ search, setSearch }: { search: string; setSearch: (v: s
 
   return (
     <header className="sticky top-0 z-40 border-b border-rose-100 bg-[#fffafc]/90 backdrop-blur">
-      <div className="bg-rose-500 px-4 py-1.5 text-center text-[13px] font-semibold text-white">
-        Free delivery on orders over R800 · Easy size exchanges · New styles weekly
+      <div className="bg-gradient-to-r from-[#c084fc] to-rose-500 px-4 py-1.5 text-center text-[13px] font-semibold text-white">
+        Women&apos;s heels K450–K650 · EU 35–45 · Official orders only: +260 760 732 751
       </div>
       <nav className="mx-auto flex w-[min(1180px,92%)] items-center gap-4 py-3">
-        <a href="#top" className="font-display flex items-center gap-2 text-xl font-bold">
-          <Flower2 className="h-6 w-6 text-rose-500" /> Petal Steps <em className="text-base text-rose-500">by TM</em>
+        <a href="#top" className="flex items-center gap-2">
+          <Flower2 className="h-6 w-6 text-rose-500" /><span className="font-script text-3xl leading-none">Petal Steps</span><span className="hidden text-[10px] font-bold uppercase tracking-[0.25em] text-stone-500 sm:block">By Thandiwe<br />Mwaba</span>
         </a>
         <button className="ml-auto md:hidden" onClick={() => setMenu(!menu)} aria-label="Menu">{menu ? <X /> : <Menu />}</button>
         <ul className={`gap-6 text-sm font-semibold md:ml-auto md:flex ${menu ? "absolute inset-x-0 top-full flex flex-col bg-white p-4 shadow-lg" : "hidden"}`}>
@@ -35,7 +35,7 @@ export function Header({ search, setSearch }: { search: string; setSearch: (v: s
       </nav>
       {showSearch && (
         <div className="mx-auto w-[min(1180px,92%)] pb-3">
-          <Input autoFocus placeholder="Search sneakers, heels, sandals…" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-full" />
+          <Input autoFocus placeholder="Search heels by colour, style or SKU… e.g. pink, red bottom, 9511" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-full" />
         </div>
       )}
     </header>

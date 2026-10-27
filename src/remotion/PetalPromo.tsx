@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
-import { AbsoluteFill, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
-const SHOE_1 = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=80&auto=format&fit=crop";
-const SHOE_2 = "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=900&q=80&auto=format&fit=crop";
-const SHOE_3 = "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=900&q=80&auto=format&fit=crop";
+const SHOE_1 = staticFile("products/image25.jpg");
+const SHOE_2 = staticFile("products/image3.jpg");
+const SHOE_3 = staticFile("products/image21.jpg");
 
 const PETALS = ["🌸", "🌺", "🌷", "💮", "🌸", "🌺", "🌷", "🌸"];
 
@@ -45,38 +45,38 @@ const pink: CSSProperties = { color: "#e75480", fontStyle: "italic" };
 
 export function PetalPromo() {
   return (
-    <AbsoluteFill style={{ backgroundColor: "#fff0f5" }}>
+    <AbsoluteFill style={{ backgroundColor: "#fff7f1" }}>
       <FallingPetals />
       <Sequence from={0} durationInFrames={75}>
-        <Scene bg="linear-gradient(135deg,#fff0f5,#ffffff)">
+        <Scene bg="linear-gradient(135deg,#fde8d7,#f3e8ff)">
           <div style={{ fontSize: 72 }}>🌸</div>
-          <h1 style={title}>Petal Steps<br /><span style={pink}>by TM</span></h1>
-          <p style={sub}>Every step blooms with style</p>
+          <h1 style={title}>Petal Steps<br /><span style={{ ...pink, fontSize: 44 }}>by Thandiwe Mwaba</span></h1>
+          <p style={sub}>Women&apos;s heels that bloom with every step · Lusaka</p>
         </Scene>
       </Sequence>
       <Sequence from={75} durationInFrames={75}>
         <Scene bg="#ffffff">
-          <Img src={SHOE_1} style={{ width: 620, height: 400, objectFit: "cover", borderRadius: 28, margin: "0 auto", boxShadow: "0 24px 50px rgba(231,84,128,.25)" }} />
-          <h2 style={{ ...title, fontSize: 56, marginTop: 28 }}>Bloom Runner Sneakers</h2>
-          <p style={{ ...sub, color: "#c73e68", fontWeight: 700 }}>Now R 899 · was R 1 199</p>
+          <Img src={SHOE_1} style={{ width: 520, height: 560, objectFit: "cover", borderRadius: 28, margin: "0 auto", boxShadow: "0 24px 50px rgba(231,84,128,.25)" }} />
+          <h2 style={{ ...title, fontSize: 52, marginTop: 24 }}>Black Red-Bottom Stiletto</h2>
+          <p style={{ ...sub, color: "#c73e68", fontWeight: 700 }}>K650 · EU 38–43 · 12 pairs</p>
         </Scene>
       </Sequence>
       <Sequence from={150} durationInFrames={75}>
-        <Scene bg="linear-gradient(135deg,#ffffff,#fff0f5)">
+        <Scene bg="linear-gradient(135deg,#ffffff,#fde8d7)">
           <div style={{ display: "flex", gap: 22, justifyContent: "center" }}>
-            <Img src={SHOE_2} style={{ width: 300, height: 340, objectFit: "cover", borderRadius: 24 }} />
-            <Img src={SHOE_3} style={{ width: 300, height: 340, objectFit: "cover", borderRadius: 24 }} />
+            <Img src={SHOE_2} style={{ width: 300, height: 380, objectFit: "cover", borderRadius: 24 }} />
+            <Img src={SHOE_3} style={{ width: 300, height: 380, objectFit: "cover", borderRadius: 24 }} />
           </div>
-          <h2 style={{ ...title, fontSize: 54, marginTop: 28 }}>Women · Men · Kids</h2>
-          <p style={sub}>Heels, sneakers, sandals, boots &amp; more</p>
+          <h2 style={{ ...title, fontSize: 50, marginTop: 24 }}>29 styles · 247 pairs</h2>
+          <p style={sub}>Matte · Glossy · Statement · Red Bottom — EU 35–45</p>
         </Scene>
       </Sequence>
       <Sequence from={225} durationInFrames={75}>
-        <Scene bg="linear-gradient(120deg,#e75480,#f78fb0)">
-          <h2 style={{ ...title, color: "#fff", fontSize: 68 }}>Up to 40% OFF</h2>
-          <p style={{ ...sub, color: "#ffe3ee" }}>Free delivery on orders over R800</p>
-          <div style={{ marginTop: 34, display: "inline-block", background: "#fff", color: "#c73e68", fontFamily: "Arial", fontWeight: 800, fontSize: 28, padding: "16px 38px", borderRadius: 99 }}>
-            Shop Petal Steps by TM 🌸
+        <Scene bg="linear-gradient(120deg,#c084fc,#e75480)">
+          <h2 style={{ ...title, color: "#fff", fontSize: 64 }}>Heels K450–K650</h2>
+          <p style={{ ...sub, color: "#ffe3ee" }}>Order only on WhatsApp +260 760 732 751<br />Munali Rd 4774, Thompson Park, Lusaka</p>
+          <div style={{ marginTop: 30, display: "inline-block", background: "#fff", color: "#c73e68", fontFamily: "Arial", fontWeight: 800, fontSize: 28, padding: "16px 38px", borderRadius: 99 }}>
+            Shop Petal Steps 🌸
           </div>
         </Scene>
       </Sequence>

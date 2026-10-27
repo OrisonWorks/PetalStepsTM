@@ -3,11 +3,13 @@
 @theme {
   --font-sans: "Inter", ui-sans-system, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, serif;
+  --font-script: "Great Vibes", cursive;
 }
 
 html { scroll-behavior: smooth; }
-body { background: #fffafc; color: #2b1a22; font-family: var(--font-sans); }
+body { background: #fff7f1; color: #24151b; font-family: var(--font-sans); }
 .font-display { font-family: var(--font-display); }
+.font-script { font-family: var(--font-script); }
 
 @keyframes marquee { to { transform: translateX(-50%); } }
 .animate-marquee { animation: marquee 26s linear infinite; }
