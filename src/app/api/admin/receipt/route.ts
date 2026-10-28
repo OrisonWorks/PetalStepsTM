@@ -49,34 +49,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: data.error || "receipt failed" }, { status: 502 });
     }
     const no: string = data.no;
+    const key: string = data.key || "";
+    const link = `${origin}/receipt/${no}?k=${key}`;
     let emailed = false;
     const email = typeof body.email === "string" ? body.email.trim() : "";
     if (email) {
-      const text = [
-        "Petal Steps by Thandiwe Mwaba",
-        "Receipt " + no,
-        "",
-        "Received from: " + fields.client,
-        "Sum of: " + (fields.words || "K" + amount.toLocaleString("en-ZM")),
-        "Amount: K" + amount.toLocaleString("en-ZM") + (fields.balance ? " · Balance: " + fields.balance : ""),
-        "Payment for: " + (fields.items || "—"),
-        "Method: " + (fields.method || "—"),
-        "",
-        "View receipt: " + origin + "/receipt/" + no,
-        "",
-        "Thank you for shopping with us 🌸",
-        "Block A Shop B, Thompson Park, Munali Rd 4774, Lusaka · +260 76 0732751",
-      ].join("\n");
-      const sent = await call({
-        token,
-        action: "sendReceiptEmail",
-        email,
-        subject: "Your Petal Steps receipt " + no,
-        body: text,
-      });
-      emailed = Boolean(sent.ok);
+      // A failed send must not fail the request — the receipt already
+      // exists and returning an error would invite a duplicate create.
+      try {
+        const text = [
+          "Petal Steps by Thandiwe Mwaba",
+          "Receipt " + no,
+          "",
+          "Received from: " + fields.client,
+          "Sum of: " + (fields.words || "K" + amount.toLocaleString("en-ZM")),
+          "Amount: K" + amount.toLocaleString("en-ZM") + (fields.balance ? " · Balance: " + fields.balance : ""),
+          "Payment for: " + (fields.items || "—"),
+          "Method: " + (fields.method || "—"),
+          "",
+          "View receipt: " + link,
+          "",
+          "Thank you for shopping with us 🌸",
+          "Block A Shop B, Thompson Park, Munali Rd 4774, Lusaka · +260 76 0732751",
+        ].join("\n");
+        const sent = await call({
+          token,
+          action: "sendReceiptEmail",
+          email,
+          subject: "Your Petal Steps receipt " + no,
+          body: text,
+        });
+        emailed = Boolean(sent.ok);
+      } catch {
+        emailed = false;
+      }
     }
-    return NextResponse.json({ ok: true, no, emailed });
+    return NextResponse.json({ ok: true, no, key, emailed });
   } catch {
     return NextResponse.json({ ok: false, error: "writer unreachable" }, { status: 502 });
   }

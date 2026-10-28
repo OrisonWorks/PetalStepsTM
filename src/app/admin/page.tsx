@@ -121,7 +121,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
     note: "",
   });
   const [saving, setSaving] = useState(false);
-  const [created, setCreated] = useState("");
+  const [created, setCreated] = useState<{ no: string; key: string } | null>(null);
   const [skuPick, setSkuPick] = useState("");
   const [sizePick, setSizePick] = useState("");
 
@@ -156,7 +156,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
         toast.error(d.error || "Receipt failed");
         return;
       }
-      setCreated(d.no);
+      setCreated({ no: d.no, key: d.key || "" });
       toast.success(`Receipt ${d.no} created${d.emailed ? " and emailed" : ""}`);
     } catch {
       toast.error("Receipt failed");
@@ -166,17 +166,17 @@ function ReceiptPanel({ products }: { products: Product[] }) {
   };
 
   const reset = () => {
-    setCreated("");
+    setCreated(null);
     setForm({ client: "", phone: "", email: "", items: "", amount: "", words: "", method: "Cash", balance: "", note: "" });
   };
 
   if (created) {
-    const link = `${window.location.origin}/receipt/${created}`;
-    const shareText = `Your Petal Steps receipt ${created} — ${link}`;
+    const link = `${window.location.origin}/receipt/${created.no}?k=${created.key}`;
+    const shareText = `Your Petal Steps receipt ${created.no} — ${link}`;
     return (
       <div className="rounded-2xl border border-rose-100 bg-white p-6 text-center">
         <p className="text-sm text-stone-500">Receipt created</p>
-        <p className="font-display mt-1 text-3xl font-semibold text-rose-600">{created}</p>
+        <p className="font-display mt-1 text-3xl font-semibold text-rose-600">{created.no}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <a
             href={form.phone ? `https://wa.me/${form.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(shareText)}` : waLink(shareText)}
@@ -195,7 +195,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
           >
             Copy link
           </button>
-          <a href={`/receipt/${created}`} target="_blank" rel="noreferrer" className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-700">
+          <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-700">
             View receipt
           </a>
           <button onClick={reset} className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-600">

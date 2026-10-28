@@ -22,7 +22,8 @@ export default function ReceiptPage({ params }: { params: Promise<{ no: string }
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
 
   useEffect(() => {
-    fetch(`/api/receipt/${encodeURIComponent(no)}`, { cache: "no-store" })
+    const k = new URLSearchParams(window.location.search).get("k") || "";
+    fetch(`/api/receipt/${encodeURIComponent(no)}?k=${encodeURIComponent(k)}`, { cache: "no-store" })
       .then(async (res) => {
         const d = await res.json().catch(() => ({}));
         if (res.ok && d.ok) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getProducts } from "@/lib/sheet-products";
 
 // Public, fire-and-forget endpoint: the storefront posts here when a client
 // taps "order on WhatsApp" so the shop can see interest before the message
@@ -10,17 +11,20 @@ const WINDOW_MS = 60 * 1000;
 const MAX_PER_IP = 20;
 
 function clientIp(req: Request): string {
-  // Vercel sets x-vercel-forwarded-for; fall back to first XFF hop or a
-  // bucket key when behind an unknown proxy.
+  // Only Vercel's own header is trustworthy — plain x-forwarded-for is
+  // client-settable and would let a caller rotate IPs past the limit.
+  // Off-platform there is no trusted IP, so all callers share one bucket.
   const vff = req.headers.get("x-vercel-forwarded-for");
   if (vff) return vff.split(",")[0].trim();
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return "anon";
+  return "all";
 }
 
 function allowed(ip: string): boolean {
   const now = Date.now();
+  if (hits.size > 5000) {
+    // prune expired buckets so a flood of distinct IPs can't grow the map
+    for (const [k, e] of hits) if (now > e.resetAt) hits.delete(k);
+  }
   const e = hits.get(ip);
   if (!e || now > e.resetAt) {
     hits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
@@ -43,6 +47,12 @@ export async function POST(req: Request) {
   const model = typeof body.model === "string" ? body.model.trim() : "";
   if (!model || model.length > 60) {
     return NextResponse.json({ ok: false, error: "model required" }, { status: 400 });
+  }
+  // Only real catalogue SKUs can be logged — otherwise unauthenticated
+  // callers could inject bogus products (or formula strings) into reports.
+  const { products } = await getProducts(true);
+  if (!products.some((p) => p.sku === model)) {
+    return NextResponse.json({ ok: false, error: "unknown model" }, { status: 400 });
   }
   const size = Number(body.size);
   const note = typeof body.note === "string" ? body.note.slice(0, 200) : "";
