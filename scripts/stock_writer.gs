@@ -179,7 +179,10 @@ function updateProduct(body, out) {
     const written = {};
     for (const key of ALLOWED) {
       if (fields[key] == null) continue;
-      const value = String(fields[key]).trim();
+      let value = String(fields[key]).trim();
+      // A leading =, +, -, @ would be stored as a live formula; the
+      // apostrophe prefix forces a literal cell (not displayed).
+      if (/^[=+\-@]/.test(value)) value = "'" + value;
       let col = headers.indexOf(key);
       if (col < 0) {
         col = nextCol;

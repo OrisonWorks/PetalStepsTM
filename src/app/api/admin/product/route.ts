@@ -38,6 +38,14 @@ export async function POST(req: Request) {
   if (Object.keys(fields).length === 0) {
     return NextResponse.json({ ok: false, error: "nothing to update" }, { status: 400 });
   }
+  // Reject values the parser can't represent: it drops products whose name is
+  // empty or price isn't a positive number — a bad save would hide the style.
+  if (fields.name != null && !fields.name.trim()) {
+    return NextResponse.json({ ok: false, error: "name can't be empty" }, { status: 400 });
+  }
+  if (fields.price != null && !(parseInt(fields.price.replace(/[^0-9]/g, ""), 10) > 0)) {
+    return NextResponse.json({ ok: false, error: "price must be a positive number" }, { status: 400 });
+  }
   try {
     const res = await fetch(url, {
       method: "POST",

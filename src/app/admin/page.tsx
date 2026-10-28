@@ -29,6 +29,16 @@ function EditForm({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    const name = form.name.trim();
+    const price = form.price.trim();
+    if (!name) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    if (!(parseInt(price.replace(/[^0-9]/g, ""), 10) > 0)) {
+      toast.error("Price must be a positive number");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/admin/product", {
