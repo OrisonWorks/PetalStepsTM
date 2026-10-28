@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
-import { Categories, Contact, Footer, Hero, Marquee, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
+import { Categories, Contact, Faqs, Footer, Hero, Marquee, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
 import { Shop } from "@/components/Shop";
 import { totalPairs, type Filter, type Product } from "@/lib/products";
 
@@ -30,6 +30,7 @@ export function HomeClient({ products }: { products: Product[] }) {
         <SaleBanner onSelect={goFilter} />
         <WhyUs />
         <Reviews />
+        <Faqs />
         <Contact />
         <Newsletter />
       </main>

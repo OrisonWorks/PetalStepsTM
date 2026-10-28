@@ -98,6 +98,11 @@ Two scheduled functions live in `stock_writer.gs`. Install them once:
 3. Add `PRODUCTS_SHEET_CSV_URL` in Environment Variables (see above).
 4. Deploy. Every future `git push` to `main` auto-redeploys; sheet edits need no redeploy.
 
+## FAQs + mailing list
+
+- The homepage **FAQs** section answers ordering, payment and delivery questions in text, and the three policy card images open full-size on tap.
+- The **Petal List** subscribe form writes each email to a `SUBSCRIBERS` tab on the sheet via the writer's `subscribe` action (deduped). Requires the latest `stock_writer.gs` deployed (New version) — until then signups return an error.
+
 ## Notes
 
 - Checkout builds a WhatsApp message to the official number — no online payments, stock is confirmed manually on WhatsApp as per shop policy.

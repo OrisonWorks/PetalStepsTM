@@ -1,11 +1,12 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { BadgeCheck, Clock, Facebook, MapPin, MessageCircle, PiggyBank, ShieldCheck, Star, Truck } from "lucide-react";
+import { BadgeCheck, ChevronDown, Clock, Facebook, MapPin, MessageCircle, PiggyBank, ShieldCheck, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PromoPlayer } from "@/components/PromoPlayer";
 import { FB_URL, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
@@ -166,7 +167,7 @@ export function Contact() {
             <li className="flex items-center gap-2"><Truck className="h-5 w-5 text-rose-500" /> Pick up within 5 days, or K5/day storage applies</li>
           </ul>
           <div className="mt-6 grid grid-cols-3 gap-2">
-            {["/brand/order-payment.jpg", "/brand/delivery-lusaka.jpg", "/brand/delivery-out-of-town.jpg"].map((src) => <Image key={src} src={src} alt="Petal Steps order and delivery information" width={300} height={380} className="h-36 w-full rounded-xl object-cover object-top" />)}
+            <PolicyCards />
           </div>
         </div>
         <form onSubmit={submit} className="space-y-3 rounded-3xl border border-rose-100 bg-white p-6 shadow-xl shadow-rose-500/10">
@@ -180,8 +181,184 @@ export function Contact() {
   );
 }
 
+const POLICY_CARDS = [
+  { src: "/brand/order-payment.jpg", title: "Order & payment details" },
+  { src: "/brand/delivery-lusaka.jpg", title: "Delivery policy — Lusaka" },
+  { src: "/brand/delivery-out-of-town.jpg", title: "Out-of-town delivery" },
+];
+
+// The three printed policy cards: thumbnails open a readable full-size view.
+export function PolicyCards() {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <>
+      {POLICY_CARDS.map((c, i) => (
+        <button
+          key={c.src}
+          type="button"
+          onClick={() => setOpen(i)}
+          title={`${c.title} — tap to read`}
+          className="group overflow-hidden rounded-xl border border-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-400"
+        >
+          <Image
+            src={c.src}
+            alt={c.title}
+            width={300}
+            height={380}
+            className="h-36 w-full object-cover object-top transition group-hover:scale-105"
+          />
+        </button>
+      ))}
+      <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
+        <DialogContent className="max-w-xl p-0">
+          {open !== null && (
+            <>
+              <DialogTitle className="sr-only">{POLICY_CARDS[open].title}</DialogTitle>
+              <Image
+                src={POLICY_CARDS[open].src}
+                alt={POLICY_CARDS[open].title}
+                width={1080}
+                height={1350}
+                className="h-auto w-full"
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+const FAQS: { q: string; a: React.ReactNode }[] = [
+  {
+    q: "How do I place an order?",
+    a: (
+      <>
+        Confirm availability on WhatsApp before paying, then send your{" "}
+        <strong>name, number, location, product paid for, and courier of choice</strong>,
+        and attach your proof of payment. Lusaka orders send a Yango for collection
+        (request booking details first); out-of-town orders go by courier, charged
+        separately after weighing and valuation.
+      </>
+    ),
+  },
+  {
+    q: "How do I pay?",
+    a: (
+      <>
+        Mobile money only, then attach proof of payment.{" "}
+        <strong>Airtel:</strong> 0977235607 — Option 1: Send Money (Daniel Mwaba).{" "}
+        <strong>MTN:</strong> 0962222926 — Option 1: Send Money (Sungo Siphokazi Daka).{" "}
+        <strong>FNB eWallet:</strong> request details on WhatsApp.{" "}
+        <em>NB: kindly add the withdrawal fee to all mobile money payments.</em>
+      </>
+    ),
+  },
+  {
+    q: "How does delivery work in Lusaka?",
+    a: (
+      <>
+        You book a Yango and send the rider to collect. Booking times: Mon–Fri
+        10:00–16:00, Sat 09:00–13:00, Sun closed. Pick-up: Munali Rd 4774, Thompson
+        Park (right before Mosi-Oa-Tunya on Yango/Google Maps) — delivery bookings
+        on +260 76 0732751 only; never pay or change orders on other numbers. Send
+        the rider after confirming with the store; the rider collects inside the
+        shop. Yango waiting charges are not covered.
+      </>
+    ),
+  },
+  {
+    q: "What about out-of-town delivery?",
+    a: (
+      <>
+        Couriers: <strong>Platinum and Falcon</strong>. Cost is quoted only after
+        purchase, once the parcel is weighed and evaluated; insurance is discussed
+        directly with the courier. Other couriers may add packaging fees outside
+        the receipt — discuss with your courier. A <strong>bus courier</strong>{" "}
+        option is also available: fee negotiated and paid by you — please request a
+        receipt. Items are dispatched at designated times once packaged; once the
+        courier confirms goods are in good condition and ships them, Petal Steps is
+        not liable for loss or damage.
+      </>
+    ),
+  },
+  {
+    q: "Can I collect in person, and how long will you hold my order?",
+    a: (
+      <>
+        Yes — the shop is at {SHOP_ADDRESS}. Orders are held{" "}
+        <strong>5 days</strong>; after that a K5/day storage fee applies. Delivery
+        can be arranged at your cost.
+      </>
+    ),
+  },
+];
+
+export function Faqs() {
+  return (
+    <section id="faqs" className="bg-[#fff7f1] py-14">
+      <div className="mx-auto w-[min(880px,92%)]">
+        <h2 className="font-display text-center text-3xl font-semibold sm:text-4xl">
+          Frequently asked questions
+        </h2>
+        <p className="mt-2 text-center text-stone-500">
+          Ordering, payment and delivery — tap the policy cards below for the printed version.
+        </p>
+        <div className="mt-8 space-y-3">
+          {FAQS.map((f) => (
+            <details
+              key={f.q}
+              className="group rounded-2xl border border-rose-100 bg-white px-5 py-4 open:shadow-md open:shadow-rose-500/10"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-stone-800 [&::-webkit-details-marker]:hidden">
+                {f.q}
+                <ChevronDown className="h-5 w-5 shrink-0 text-rose-400 transition group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 text-sm leading-relaxed text-stone-600">{f.a}</p>
+            </details>
+          ))}
+        </div>
+        <div className="mx-auto mt-8 grid max-w-xl grid-cols-3 gap-3">
+          <PolicyCards />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function Newsletter() {
   const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — humans never see it
+  const [busy, setBusy] = useState(false);
+
+  const subscribe = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, website }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Couldn't subscribe — try again");
+        return;
+      }
+      toast.success(
+        d.already
+          ? "You're already on the Petal List 🌸"
+          : "Welcome to the Petal List 🌸 You're subscribed!"
+      );
+      setEmail("");
+    } catch {
+      toast.error("Couldn't subscribe — try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="bg-rose-100/70 py-12">
       <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap items-center justify-between gap-6">
@@ -189,9 +366,20 @@ export function Newsletter() {
           <h2 className="font-display text-3xl font-semibold">Join the Petal List 🌸</h2>
           <p className="text-stone-500">First dibs on new heel drops, restocks and almost-gone sizes.</p>
         </div>
-        <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); toast.success("Welcome to the Petal List 🌸 You're subscribed!"); setEmail(""); }}>
+        <form className="flex flex-wrap gap-2" onSubmit={subscribe}>
+          {/* honeypot: invisible to humans, bots fill it and get dropped */}
+          <input
+            type="text"
+            name="website"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="absolute -left-[9999px] h-0 w-0 opacity-0"
+          />
           <Input type="email" required placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} className="min-w-64 rounded-full" />
-          <Button type="submit">Subscribe</Button>
+          <Button type="submit" disabled={busy}>{busy ? "Subscribing…" : "Subscribe"}</Button>
         </form>
       </div>
     </section>
@@ -208,7 +396,7 @@ export function Footer() {
           <p className="mt-2 max-w-xs text-sm text-rose-200/70">Women&apos;s heels that bloom with every step. Lusaka, Zambia.</p>
         </div>
         <div><h4 className="font-display mb-3 font-semibold text-white">Shop</h4>{[["All heels", "#shop"], ["Matte", "#categories"], ["Glossy", "#categories"], ["Red Bottom", "#categories"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["How ordering works", "#why"], ["Delivery — Lusaka & out of town", "#contact"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["FAQs — ordering, payment & delivery", "#faqs"], ["How ordering works", "#why"], ["Delivery — Lusaka & out of town", "#faqs"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
         <div><h4 className="font-display mb-3 font-semibold text-white">Visit / follow</h4><p className="py-1 text-rose-200/80">{SHOP_ADDRESS}</p><a href={waLink("Hi Petal Steps by Thandiwe Mwaba!")} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">WhatsApp {WA_DISPLAY}</a><a href={FB_URL} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">Facebook</a></div>
       </div>
       <div className="border-t border-white/10">

@@ -24,6 +24,8 @@
  *   - Appends to the RECEIPTS tab and returns an auto-numbered PS-#### id.
  * POST JSON body: { token, action: "sendReceiptEmail", email, subject, body }
  *   - Sends the receipt text via MailApp (to the address given).
+ * POST JSON body: { token, action: "subscribe", email }
+ *   - Appends to the SUBSCRIBERS tab (TS, EMAIL), deduped — the newsletter.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
  * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
  *
@@ -58,6 +60,7 @@ function doPost(e) {
     if (body.action === "createProduct")
       return createProduct(body, out);
     if (body.action === "logEvent") return logEvent(body, out);
+    if (body.action === "subscribe") return subscribeEmail(body, out);
     if (body.action === "createReceipt") return createReceipt(body, out);
     if (body.action === "sendReceiptEmail")
       return sendReceiptEmail(body, out);
@@ -401,6 +404,33 @@ function logEvent(body, out) {
     return out({ ok: true });
   } finally {
     SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+// ---------- mailing list ----------
+
+// POST { action: "subscribe", email } → appends to a SUBSCRIBERS tab
+// (TS, EMAIL), deduped case-insensitively. Public-facing (the site's
+// newsletter form) so it does as little as possible.
+function subscribeEmail(body, out) {
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 320)
+    return out({ ok: false, error: "invalid email" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreate_(ss, "SUBSCRIBERS", ["TS", "EMAIL"]);
+    const exists = sheetRows_(ss, "SUBSCRIBERS").some(
+      (r) => String(r.email || "").trim().toLowerCase() === email
+    );
+    if (!exists) {
+      sheet.appendRow([new Date(), safe_(email)]);
+      SpreadsheetApp.flush();
+    }
+    return out({ ok: true, email, already: exists });
+  } finally {
     lock.releaseLock();
   }
 }
