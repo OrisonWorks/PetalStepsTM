@@ -4,6 +4,118 @@ import { toast } from "sonner";
 import type { Product } from "@/lib/products";
 import { totalPairs } from "@/lib/products";
 
+const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
+
+function EditForm({
+  product,
+  onSaved,
+  onCancel,
+}: {
+  product: Product;
+  onSaved: (fields: Partial<Product>) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: product.name,
+    color: product.color,
+    price: String(product.price),
+    cat: product.cat,
+    img: product.img,
+    desc: product.desc,
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: product.sku,
+          name: form.name.trim(),
+          color: form.color.trim(),
+          price: form.price.trim(),
+          cat: form.cat,
+          img: form.img.trim(),
+          desc: form.desc.trim(),
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Save failed");
+        return;
+      }
+      onSaved({
+        name: form.name.trim(),
+        color: form.color.trim(),
+        price: parseInt(form.price.replace(/[^0-9]/g, ""), 10) || product.price,
+        cat: form.cat as Product["cat"],
+        img: form.img.trim(),
+        desc: form.desc.trim(),
+      });
+      toast.success(`${form.name.trim() || product.sku} saved`);
+    } catch {
+      toast.error("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const input =
+    "w-full rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300";
+  return (
+    <form onSubmit={save} className="mt-3 grid gap-2 rounded-xl border border-rose-100 bg-rose-50/50 p-3 sm:grid-cols-2">
+      <label className="text-xs font-semibold text-stone-500">
+        Name
+        <input value={form.name} onChange={set("name")} className={input} required />
+      </label>
+      <label className="text-xs font-semibold text-stone-500">
+        Colour
+        <input value={form.color} onChange={set("color")} className={input} />
+      </label>
+      <label className="text-xs font-semibold text-stone-500">
+        Price (ZMW)
+        <input value={form.price} onChange={set("price")} className={input} inputMode="numeric" required />
+      </label>
+      <label className="text-xs font-semibold text-stone-500">
+        Category
+        <select value={form.cat} onChange={set("cat")} className={input}>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold text-stone-500 sm:col-span-2">
+        Photo (URL or /products/… path)
+        <input value={form.img} onChange={set("img")} className={input} />
+      </label>
+      <label className="text-xs font-semibold text-stone-500 sm:col-span-2">
+        Description
+        <textarea value={form.desc} onChange={set("desc")} rows={2} className={input} />
+      </label>
+      <div className="flex gap-2 sm:col-span-2">
+        <button
+          disabled={saving}
+          className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-40"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-300"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function AdminPage() {
   const [state, setState] = useState<"loading" | "login" | "ready">("loading");
   const [configured, setConfigured] = useState(true);
@@ -11,6 +123,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
+  const [editing, setEditing] = useState("");
 
   const loadProducts = useCallback(async () => {
     const res = await fetch("/api/products?all=1", { cache: "no-store" });
@@ -158,7 +271,25 @@ export default function AdminPage() {
                   {p.sku} · {p.color} · K{p.price}
                 </span>
               </div>
+              <button
+                onClick={() => setEditing(editing === p.sku ? "" : p.sku)}
+                className="ml-auto rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
+              >
+                {editing === p.sku ? "Close" : "Edit"}
+              </button>
             </div>
+            {editing === p.sku && (
+              <EditForm
+                product={p}
+                onCancel={() => setEditing("")}
+                onSaved={(fields) => {
+                  setProducts((ps) =>
+                    ps.map((q) => (q.sku === p.sku ? { ...q, ...fields } : q))
+                  );
+                  setEditing("");
+                }}
+              />
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               {Array.from({ length: 11 }, (_, i) => 35 + i).map((size) => {
                 const count = p.stock[size] ?? 0;

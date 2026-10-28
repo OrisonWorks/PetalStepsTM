@@ -62,6 +62,12 @@ A passcode-protected page at `/admin` lists every style with per-size counts and
 
 The script supports both sheet layouts: your stock-take format (`MODEL`/`SIZE`/`COUNT` rows — it updates the matching row's `COUNT`, or appends a row when restocking a size that never had one) and the catalogue format (`stock_35`…`stock_45` columns).
 
+### Editing product details from `/admin`
+
+Each style also has an **Edit** button that opens a form for name, colour, price, category, photo and description. Saves write override columns (`NAME`, `PRICE`, `CATEGORY`, `PHOTO`, `DESCRIPTION`, `COLOUR`) onto the model's first sheet row — the sheet wins over the built-in catalogue, and clearing a value back to empty restores the catalogue default.
+
+> Apps Script web apps serve the deployed version, not the latest saved code. After updating `stock_writer.gs` you must redeploy: **Deploy → Manage deployments → ✎ → Version: New version → Deploy**. The `/exec` URL stays the same.
+
 To change the passcode or token later: update the env vars and redeploy (the script keeps running — `STOCK_TOKEN` must match `STOCK_WRITER_TOKEN`).
 
 ## Deploy (Vercel)

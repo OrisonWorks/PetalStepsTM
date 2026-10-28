@@ -107,7 +107,8 @@ function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = fals
       id: products.length + 1,
       sku: model,
       name,
-      color: base?.color || firstInGroup(rs, "color") || firstInGroup(rs, "colour") || "",
+      color:
+        firstInGroup(rs, "colour") || base?.color || firstInGroup(rs, "color") || "",
       cat: CATEGORIES.includes(catRaw) ? catRaw : "matte",
       price,
       img,
