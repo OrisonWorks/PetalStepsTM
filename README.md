@@ -72,9 +72,10 @@ To change the passcode or token later: update the env vars and redeploy (the scr
 
 ### Reports, receipts and backups
 
-`/admin` has three tabs:
+`/admin` has four tabs:
 
 - **Stock** — the size grid described above.
+- **Add style** — create a brand-new style (style code, name, colour, price, category, photo + starting stock per EU size); it writes new rows to the sheet and goes live within ~a minute. Below the form is a **bulk CSV import**: download the template, fill one row per style in Google Sheets or Excel (File → Download → CSV), upload, review the validation preview, and import — bad rows are flagged and skipped, each row reports its own result.
 - **Reports** — a per-day breakdown of pairs marked sold per model, WhatsApp-order "interest" taps (logged when a client taps *Send order on WhatsApp* in their bag), and restocks. Data comes from a `LOG` tab the script auto-creates in the same spreadsheet.
 - **Receipts** — generate a numbered receipt (`PS-0001`, `PS-0002`, …) matching the shop's printed receipt pad: client name, items (quick-add from live stock), amount with amount-in-words auto-fill, method and balance. Receipts are stored in a `RECEIPTS` tab and each gets a public shareable link (`/receipt/PS-0001`) you can send the client via WhatsApp or email — the form's *Send via WhatsApp* button opens the chat with the link, and entering a client email sends them a copy automatically. Interim receipts until ZRA smart invoicing is integrated.
 
