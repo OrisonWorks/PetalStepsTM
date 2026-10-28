@@ -260,6 +260,91 @@ function ReceiptPanel({ products }: { products: Product[] }) {
 }
 
 
+function AddStylePanel({ onCreated }: { onCreated: () => void }) {
+  const [form, setForm] = useState({
+    sku: "",
+    name: "",
+    color: "",
+    price: "",
+    cat: "matte" as string,
+    img: "",
+    desc: "",
+  });
+  const [counts, setCounts] = useState<Record<number, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const sizes = Object.entries(counts)
+      .map(([size, count]) => ({ size: Number(size), count: parseInt(count, 10) || 0 }))
+      .filter((s) => s.count > 0);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/create-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, sizes }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Create failed");
+        return;
+      }
+      toast.success(`${form.name} (${d.model}) added — live on the shop in ~a minute`);
+      onCreated();
+    } catch {
+      toast.error("Create failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="grid gap-4 rounded-2xl border border-rose-100 bg-white p-5 sm:grid-cols-2">
+      <p className="text-sm text-stone-500 sm:col-span-2">
+        Add a brand-new style to the sheet. Give it a style code (e.g. the supplier model number),
+        then set starting stock per size. It appears on the shop within ~a minute.
+      </p>
+      <label className="text-xs font-semibold text-stone-500">Style code<input required value={form.sku} onChange={set("sku")} className={inputCls} placeholder="e.g. 18085-33" /></label>
+      <label className="text-xs font-semibold text-stone-500">Name<input required value={form.name} onChange={set("name")} className={inputCls} placeholder="e.g. Apricot Floral Heel" /></label>
+      <label className="text-xs font-semibold text-stone-500">Colour<input value={form.color} onChange={set("color")} className={inputCls} placeholder="e.g. Apricot" /></label>
+      <label className="text-xs font-semibold text-stone-500">Price (K)<input required value={form.price} onChange={set("price")} className={inputCls} placeholder="e.g. 450" /></label>
+      <label className="text-xs font-semibold text-stone-500">Category
+        <select value={form.cat} onChange={set("cat")} className={inputCls}>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold text-stone-500">Photo path / URL<input value={form.img} onChange={set("img")} className={inputCls} placeholder="/products/image1.jpg or https://…" /></label>
+      <label className="text-xs font-semibold text-stone-500 sm:col-span-2">Description<textarea value={form.desc} onChange={set("desc")} rows={2} className={inputCls} placeholder="Optional — shown on the product card" /></label>
+      <div className="sm:col-span-2">
+        <p className="mb-2 text-xs font-semibold text-stone-500">Starting stock per size</p>
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 11 }, (_, i) => 35 + i).map((size) => (
+            <label key={size} className="flex items-center gap-1 rounded-xl border border-rose-100 bg-rose-50/50 px-2 py-1.5 text-sm">
+              <span className="w-10 font-semibold text-stone-700">EU {size}</span>
+              <input
+                type="number" min={0} max={99}
+                value={counts[size] || ""}
+                onChange={(e) => setCounts({ ...counts, [size]: e.target.value })}
+                placeholder="0"
+                className="w-12 rounded-lg border border-stone-200 bg-white px-1.5 py-1 text-center outline-none focus:border-rose-300"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+      <button disabled={saving} className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50 sm:col-span-2">
+        {saving ? "Adding…" : "Add style"}
+      </button>
+    </form>
+  );
+}
+
 function EditForm({
   product,
   onSaved,
@@ -388,7 +473,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
-  const [view, setView] = useState<"stock" | "reports" | "receipts">("stock");
+  const [view, setView] = useState<"stock" | "reports" | "receipts" | "add">("stock");
 
   const loadProducts = useCallback(async () => {
     const res = await fetch("/api/products?all=1", { cache: "no-store" });
@@ -515,7 +600,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex gap-2">
-        {(["stock", "reports", "receipts"] as const).map((v) => (
+        {(["stock", "add", "reports", "receipts"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -523,10 +608,20 @@ export default function AdminPage() {
               view === v ? "bg-rose-500 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
           >
-            {v}
+            {v === "add" ? "add style" : v}
           </button>
         ))}
       </nav>
+      {view === "add" && (
+        <div className="mt-6">
+          <AddStylePanel
+            onCreated={async () => {
+              await loadProducts();
+              setView("stock");
+            }}
+          />
+        </div>
+      )}
       {view === "reports" && <div className="mt-6"><ReportsPanel /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
       {source !== "sheet" && view === "stock" && (

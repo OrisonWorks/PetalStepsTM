@@ -55,6 +55,8 @@ function doPost(e) {
 
     if (body.action === "updateProduct")
       return updateProduct(body, out);
+    if (body.action === "createProduct")
+      return createProduct(body, out);
     if (body.action === "logEvent") return logEvent(body, out);
     if (body.action === "createReceipt") return createReceipt(body, out);
     if (body.action === "sendReceiptEmail")
@@ -217,6 +219,95 @@ function updateProduct(body, out) {
       written[key] = value;
     }
     return out({ ok: true, model, updated: written });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+// POST { action: "createProduct", model, fields: {name, price, category,
+// colour, photo, description}, sizes: [{size, count}, ...] }
+// Adds a brand-new style: one stock-take row per size (colour goes in the
+// per-row COLOR column), metadata overrides on the first new row. The
+// parser prefers these sheet values, so the style is live without a
+// catalogue entry.
+function createProduct(body, out) {
+  const model = String(body.model || "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{1,29}$/.test(model))
+    return out({ ok: false, error: "model: 2-30 letters/digits/-/_" });
+  const fields = body.fields || {};
+  if (!String(fields.name || "").trim())
+    return out({ ok: false, error: "name required" });
+  const price = parseFloat(String(fields.price || ""));
+  if (!(price > 0)) return out({ ok: false, error: "price must be positive" });
+  // The storefront parser only reads EU 35–45 stock — outside sizes would
+  // create a style it can never show.
+  const sizes = (Array.isArray(body.sizes) ? body.sizes : [])
+    .map((s) => ({
+      size: parseInt(s && s.size, 10),
+      count: Math.max(0, parseInt(s && s.count, 10) || 0),
+    }))
+    .filter((s) => s.size >= 35 && s.size <= 45 && s.count > 0);
+  if (sizes.length === 0)
+    return out({ ok: false, error: "at least one size with stock required" });
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map((h) =>
+      String(h).trim().toLowerCase().replace(/\s+/g, "_")
+    );
+    // Match exactly the headers the storefront parser reads — accepting
+    // SKU/QTY here would write rows the site can't see.
+    const modelCol = headers.indexOf("model");
+    const sizeCol = headers.indexOf("size");
+    const countCol = headers.indexOf("count");
+    const colorCol = headers.indexOf("color");
+    if (modelCol < 0 || sizeCol < 0 || countCol < 0)
+      return out({ ok: false, error: "needs stock-take layout (MODEL/SIZE/COUNT)" });
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][modelCol]).trim() === model)
+        return out({ ok: false, error: "model already exists", model });
+    }
+
+    let nextCol = data[0].length;
+    const ensureCol = (key) => {
+      let col = headers.indexOf(key);
+      if (col < 0) {
+        col = nextCol;
+        headers.push(key);
+        sheet.getRange(1, col + 1).setValue(key.toUpperCase());
+        nextCol++;
+      }
+      return col;
+    };
+
+    const firstRow = sheet.getLastRow() + 1;
+    for (const s of sizes) {
+      const row = new Array(nextCol).fill("");
+      if (colorCol >= 0) row[colorCol] = safe_(fields.colour || "");
+      row[sizeCol] = s.size;
+      row[countCol] = s.count;
+      row[modelCol] = model;
+      sheet.appendRow(row);
+    }
+    // Metadata overrides on the first appended row — same mechanism
+    // updateProduct uses.
+    const OVERRIDE = ["name", "price", "category", "description", "photo"];
+    for (const key of OVERRIDE) {
+      if (fields[key] == null || String(fields[key]).trim() === "") continue;
+      const col = ensureCol(key);
+      sheet.getRange(firstRow, col + 1).setValue(safe_(fields[key]));
+    }
+    appendLog_(
+      "restock",
+      model,
+      "",
+      "new style · " + sizes.map((s) => "EU" + s.size + "×" + s.count).join(", ")
+    );
+    return out({ ok: true, model, sizes });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();
