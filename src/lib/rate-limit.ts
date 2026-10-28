@@ -5,23 +5,20 @@
 // attacker can lock out the real admin for up to WINDOW_MS; accepted because
 // brute-force resistance matters more for this endpoint.
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILURES = 10;
+const MAX_ATTEMPTS = 10;
 
-let failures = { count: 0, resetAt: 0 };
+let attempts = { count: 0, resetAt: 0 };
 
-export function loginRateLimited(): boolean {
-  return failures.count >= MAX_FAILURES && Date.now() < failures.resetAt;
-}
-
-export function recordLoginFailure(): void {
+// Counts a login attempt and reports whether it may proceed. Must be called
+// BEFORE the first await in the route: the increment is synchronous, so
+// concurrent requests can't all pass a check-then-record race.
+export function loginAttemptAllowed(): boolean {
   const now = Date.now();
-  if (now > failures.resetAt) {
-    failures = { count: 1, resetAt: now + WINDOW_MS };
-  } else {
-    failures.count += 1;
-  }
+  if (now > attempts.resetAt) attempts = { count: 0, resetAt: now + WINDOW_MS };
+  attempts.count += 1;
+  return attempts.count <= MAX_ATTEMPTS;
 }
 
-export function clearLoginFailures(): void {
-  failures = { count: 0, resetAt: 0 };
+export function clearLoginAttempts(): void {
+  attempts = { count: 0, resetAt: 0 };
 }
