@@ -14,6 +14,91 @@ const inputCls =
 
 type LogRow = { ts: string; action: string; model: string; size: string; note: string };
 
+type Subscriber = { ts: string; email: string };
+
+function SubscribersPanel() {
+  const [subs, setSubs] = useState<Subscriber[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/subscribers", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          toast.error(data.error || "Couldn't load subscribers");
+          return;
+        }
+        setSubs(data.subscribers || []);
+      } catch {
+        toast.error("Couldn't load subscribers");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const copyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(subs.map((s) => s.email).join(", "));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Copy failed — select the emails manually");
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-semibold text-stone-800">Petal List subscribers</h2>
+        <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
+          {subs.length} {subs.length === 1 ? "subscriber" : "subscribers"}
+        </span>
+        {subs.length > 0 && (
+          <button
+            onClick={copyAll}
+            className="ml-auto rounded-lg bg-rose-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-rose-600"
+          >
+            {copied ? "Copied!" : "Copy all emails"}
+          </button>
+        )}
+      </div>
+      {loading ? (
+        <p className="mt-4 text-sm text-stone-400">Loading…</p>
+      ) : subs.length === 0 ? (
+        <p className="mt-4 py-6 text-center text-sm text-stone-400">
+          No subscribers yet — signups from the site footer appear here.
+        </p>
+      ) : (
+        <table className="mt-4 w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
+              <th className="pb-2">Email</th>
+              <th className="pb-2 text-right">Subscribed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...subs].reverse().map((s, i) => (
+              <tr key={`${s.email}-${i}`} className="border-t border-rose-50">
+                <td className="py-2 font-semibold text-stone-700">{s.email}</td>
+                <td className="py-2 text-right text-stone-500">
+                  {String(s.ts).slice(0, 16).replace("T", " ")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="mt-4 text-xs text-stone-400">
+        Stored on the SUBSCRIBERS tab of your stock sheet — “Copy all emails” gives a comma-separated
+        list for a BCC email or broadcast tool.
+      </p>
+    </div>
+  );
+}
+
 function ReportsPanel() {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState<LogRow[]>([]);
@@ -737,7 +822,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
-  const [view, setView] = useState<"stock" | "reports" | "receipts" | "add">("stock");
+  const [view, setView] = useState<"stock" | "reports" | "receipts" | "add" | "list">("stock");
 
   const loadProducts = useCallback(async () => {
     const res = await fetch("/api/products?all=1", { cache: "no-store" });
@@ -864,7 +949,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex gap-2">
-        {(["stock", "add", "reports", "receipts"] as const).map((v) => (
+        {(["stock", "add", "reports", "receipts", "list"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -872,7 +957,7 @@ export default function AdminPage() {
               view === v ? "bg-rose-500 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
           >
-            {v === "add" ? "add style" : v}
+            {v === "add" ? "add style" : v === "list" ? "mailing list" : v}
           </button>
         ))}
       </nav>
@@ -896,6 +981,7 @@ export default function AdminPage() {
       )}
       {view === "reports" && <div className="mt-6"><ReportsPanel /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
+      {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
       {source !== "sheet" && view === "stock" && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           The shop is on the fallback catalogue — stock writes still go to the sheet, but the site
