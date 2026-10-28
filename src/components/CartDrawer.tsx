@@ -19,6 +19,15 @@ export function CartDrawer() {
     const lines = items.map((i) => `• ${i.name} (${i.sku}) — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
     const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}\n\nPlease confirm availability before I pay. Thank you!`;
     toast.success("Order ready! Opening WhatsApp — our only official number…");
+    // Fire-and-forget interest log — never blocks or errors the checkout.
+    items.forEach((i) =>
+      fetch("/api/log-interest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty} · ${form.phone || "no number"}` }),
+        keepalive: true,
+      }).catch(() => {})
+    );
     setTimeout(() => window.open(waLink(msg), "_blank"), 900);
     clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka" }); setOpen(false);
   };
