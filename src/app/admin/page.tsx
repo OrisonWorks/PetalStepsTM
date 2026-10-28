@@ -448,60 +448,79 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       setItems(null);
       return;
     }
-    setItems(rows.slice(1).map((r) => csvToItem(r, cols)));
+    const parsed = rows.slice(1).map((r) => csvToItem(r, cols));
+    // A second row with the same code would always lose to the first — the
+    // writer creates one then rejects the rest as "model already exists".
+    const seen = new Set<string>();
+    parsed.forEach((it) => {
+      if (it.error) return;
+      if (seen.has(it.sku)) it.error = "duplicate style code in file";
+      seen.add(it.sku);
+    });
+    setItems(parsed);
   };
 
   const importItems = async () => {
     if (!items) return;
     // Only rows that haven't succeeded — retrying a created model just
     // earns a "model already exists" rejection.
-    const pending = items.filter((i) => !i.error && !i.done);
-    if (pending.length === 0) return;
+    const pendingIdx = items
+      .map((it, i) => ({ it, i }))
+      .filter(({ it }) => !it.error && !it.done)
+      .map(({ i }) => i);
+    if (pendingIdx.length === 0) return;
     setImporting(true);
     setProgress(0);
-    const allResults: { model: string; ok: boolean; error?: string }[] = [];
+    // Track rows by position, not model code (duplicates share a code), and
+    // apply each batch's results immediately so a later failure can't drop
+    // rows that already landed on the sheet.
+    let current = [...items];
+    let added = 0;
+    let failed = 0;
+    let aborted = false;
     try {
       // The API caps at 200 items per request — chunk bigger files.
-      for (let off = 0; off < pending.length; off += BATCH_SIZE) {
+      for (let off = 0; off < pendingIdx.length; off += BATCH_SIZE) {
+        const batchIdx = pendingIdx.slice(off, off + BATCH_SIZE);
         const res = await fetch("/api/admin/create-products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: pending.slice(off, off + BATCH_SIZE) }),
+          body: JSON.stringify({ items: batchIdx.map((i) => current[i]) }),
         });
         const d = await res.json().catch(() => ({}));
         if (!res.ok || !d.ok) {
           toast.error(d.error || "Import failed");
-          return;
+          aborted = true;
+          break;
         }
-        allResults.push(...(d.results || []));
-        setProgress(Math.min(off + BATCH_SIZE, pending.length));
+        const batchResults: { model: string; ok: boolean; error?: string }[] = d.results || [];
+        // results[i] answers items[i] — zip by position, never by model.
+        batchResults.forEach((r, pos) => {
+          const rowIdx = batchIdx[pos];
+          if (rowIdx === undefined) return;
+          current[rowIdx] = r.ok
+            ? { ...current[rowIdx], done: true, serverError: undefined }
+            : { ...current[rowIdx], serverError: r.error };
+          if (r.ok) added++;
+          else failed++;
+        });
+        setItems([...current]);
+        setResults((prev) => [...(prev || []), ...batchResults]);
+        setProgress(Math.min(off + BATCH_SIZE, pendingIdx.length));
       }
-      const byModel = new Map(allResults.map((r) => [r.model, r]));
-      // Merge per-model results across retries and mark rows on screen.
-      setResults((prev) => {
-        const merged = new Map((prev || []).map((r) => [r.model, r]));
-        allResults.forEach((r) => merged.set(r.model, r));
-        return [...merged.values()];
-      });
-      const next = items.map((it) => {
-        const r = byModel.get(it.sku);
-        if (!r) return it;
-        return r.ok ? { ...it, done: true, serverError: undefined } : { ...it, serverError: r.error };
-      });
-      setItems(next);
-      const failed = allResults.filter((r) => !r.ok).length;
-      const left = next.filter((i) => !i.error && !i.done).length;
-      if (failed === 0) {
-        toast.success(`${allResults.length} styles added — live on the shop in ~a minute`);
+      const left = current.filter((i) => !i.error && !i.done).length;
+      if (!aborted && failed === 0) {
+        toast.success(`${added} styles added — live on the shop in ~a minute`);
         if (left === 0) {
           setItems(null);
           onDone();
         }
-      } else {
-        toast.error(`${allResults.length - failed} added, ${failed} failed — see below`);
+      } else if (!aborted) {
+        toast.error(`${added} added, ${failed} failed — see below`);
       }
     } catch {
       toast.error("Import failed");
+      setItems([...current]);
     } finally {
       setImporting(false);
     }
