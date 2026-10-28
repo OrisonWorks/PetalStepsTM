@@ -28,16 +28,20 @@ export async function POST(req: Request) {
   if (!name) {
     return NextResponse.json({ ok: false, error: "name required" }, { status: 400 });
   }
-  const price = String(body.price || "").trim();
-  if (!(parseInt(price.replace(/[^0-9]/g, ""), 10) > 0)) {
+  // The sheet parser strips non-digits from prices — "450.50" would come
+  // back as 45050. Normalize to the integer ZMW string before writing.
+  const priceDigits = String(body.price || "").trim().replace(/[^0-9]/g, "");
+  if (!(parseInt(priceDigits, 10) > 0)) {
     return NextResponse.json({ ok: false, error: "price must be a positive number" }, { status: 400 });
   }
+  // Parser only tracks EU 35–45; accepting outside sizes would create a
+  // style the shop can never show.
   const sizes = (Array.isArray(body.sizes) ? body.sizes : [])
     .map((s: { size?: unknown; count?: unknown }) => ({
       size: parseInt(String(s && s.size), 10),
       count: Math.max(0, parseInt(String(s && s.count), 10) || 0),
     }))
-    .filter((s: { size: number; count: number }) => s.size >= 30 && s.size <= 50 && s.count > 0);
+    .filter((s: { size: number; count: number }) => s.size >= 35 && s.size <= 45 && s.count > 0);
   if (sizes.length === 0) {
     return NextResponse.json(
       { ok: false, error: "add stock for at least one size" },
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
   }
   const fields = {
     name,
-    price,
+    price: String(parseInt(priceDigits, 10)),
     category: String(body.cat || "").slice(0, 30),
     colour: String(body.color || "").slice(0, 40),
     photo: String(body.img || "").slice(0, 500),

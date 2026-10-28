@@ -240,12 +240,14 @@ function createProduct(body, out) {
     return out({ ok: false, error: "name required" });
   const price = parseFloat(String(fields.price || ""));
   if (!(price > 0)) return out({ ok: false, error: "price must be positive" });
+  // The storefront parser only reads EU 35–45 stock — outside sizes would
+  // create a style it can never show.
   const sizes = (Array.isArray(body.sizes) ? body.sizes : [])
     .map((s) => ({
       size: parseInt(s && s.size, 10),
       count: Math.max(0, parseInt(s && s.count, 10) || 0),
     }))
-    .filter((s) => s.size >= 30 && s.size <= 50 && s.count > 0);
+    .filter((s) => s.size >= 35 && s.size <= 45 && s.count > 0);
   if (sizes.length === 0)
     return out({ ok: false, error: "at least one size with stock required" });
 
@@ -257,15 +259,11 @@ function createProduct(body, out) {
     const headers = data[0].map((h) =>
       String(h).trim().toLowerCase().replace(/\s+/g, "_")
     );
-    const modelCol =
-      headers.indexOf("model") >= 0
-        ? headers.indexOf("model")
-        : headers.indexOf("sku");
+    // Match exactly the headers the storefront parser reads — accepting
+    // SKU/QTY here would write rows the site can't see.
+    const modelCol = headers.indexOf("model");
     const sizeCol = headers.indexOf("size");
-    const countCol =
-      headers.indexOf("count") >= 0
-        ? headers.indexOf("count")
-        : headers.indexOf("qty");
+    const countCol = headers.indexOf("count");
     const colorCol = headers.indexOf("color");
     if (modelCol < 0 || sizeCol < 0 || countCol < 0)
       return out({ ok: false, error: "needs stock-take layout (MODEL/SIZE/COUNT)" });
