@@ -22,3 +22,17 @@ export function loginAttemptAllowed(): boolean {
 export function clearLoginAttempts(): void {
   attempts = { count: 0, resetAt: 0 };
 }
+
+// Public newsletter endpoint: global cap (60/hour). Global rather than
+// per-IP — forwarded headers are spoofable, and subscription volume on a
+// small shop is low enough that a shared ceiling is fine.
+const SUB_WINDOW_MS = 60 * 60 * 1000;
+const SUB_MAX = 60;
+let subs = { count: 0, resetAt: 0 };
+
+export function subscribeAllowed(): boolean {
+  const now = Date.now();
+  if (now > subs.resetAt) subs = { count: 0, resetAt: now + SUB_WINDOW_MS };
+  subs.count += 1;
+  return subs.count <= SUB_MAX;
+}
