@@ -107,7 +107,8 @@ function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = fals
       id: products.length + 1,
       sku: model,
       name,
-      color: base?.color || firstInGroup(rs, "color") || firstInGroup(rs, "colour") || "",
+      color:
+        firstInGroup(rs, "colour") || base?.color || firstInGroup(rs, "color") || "",
       cat: CATEGORIES.includes(catRaw) ? catRaw : "matte",
       price,
       img,
@@ -119,6 +120,7 @@ function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = fals
 }
 
 function catalogueRowsToProducts(rows: Record<string, string>[], includeEmpty = false): Product[] {
+  const bySku = new Map(PRODUCTS.map((p) => [p.sku, p]));
   const products: Product[] = [];
   for (const r of rows) {
     if (isInactive(r.active)) continue;
@@ -133,12 +135,13 @@ function catalogueRowsToProducts(rows: Record<string, string>[], includeEmpty = 
     }
     if (!includeEmpty && Object.keys(stock).length === 0) continue;
     const catRaw = (r.category || r.cat || "matte").toLowerCase().replace(/\s+/g, "-") as Category;
-    const img = toImage(r.photo || r.image || r.img || "") || "/products/image1.jpg";
+    const img = toImage(r.photo || r.image || r.img || "")
+      || bySku.get(sku)?.img || "/products/image1.jpg";
     products.push({
       id: products.length + 1,
       sku,
       name,
-      color: r.color || r.colour || "",
+      color: r.colour || r.color || "",
       cat: CATEGORIES.includes(catRaw) ? catRaw : "matte",
       price,
       img,

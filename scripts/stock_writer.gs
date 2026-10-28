@@ -12,6 +12,10 @@
  * POST JSON body: { token, model, size, set? , delta? }
  *   - `set` writes an absolute count; otherwise `delta` (default -1) is applied,
  *     clamped at 0.
+ * POST JSON body: { token, action: "updateProduct", model, fields }
+ *   - `fields` may set: name, price, category, description, photo, colour,
+ *     active. Columns are created if missing; only provided keys are written,
+ *     always to the model's first row (the site reads first non-empty value).
  * Stock-take layout (one row per size): finds every row matching MODEL+SIZE,
  * treats the summed COUNT as the live count, writes the new count to the first
  * row and zeroes duplicates. Restocking a size with no row appends one.
@@ -32,6 +36,9 @@ function doPost(e) {
     );
     if (!token || body.token !== token)
       return out({ ok: false, error: "unauthorized" });
+
+    if (body.action === "updateProduct")
+      return updateProduct(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -124,5 +131,71 @@ function doPost(e) {
     }
   } catch (err) {
     return out({ ok: false, error: String(err) });
+  }
+}
+
+// Writes product metadata overrides (name/price/category/description/photo/
+// colour/active) into the model's first row, creating columns when missing.
+// The site's parser prefers these sheet values over the built-in catalogue.
+function updateProduct(body, out) {
+  const model = String(body.model || "").trim();
+  const fields = body.fields;
+  if (!model || !fields || typeof fields !== "object")
+    return out({ ok: false, error: "model and fields required" });
+  const ALLOWED = [
+    "name",
+    "price",
+    "category",
+    "description",
+    "photo",
+    "colour",
+    "active",
+  ];
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map((h) =>
+      String(h).trim().toLowerCase().replace(/\s+/g, "_")
+    );
+    const modelCol =
+      headers.indexOf("model") >= 0
+        ? headers.indexOf("model")
+        : headers.indexOf("sku");
+    if (modelCol < 0)
+      return out({ ok: false, error: "no model/sku column" });
+    let rowIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][modelCol]).trim() === model) {
+        rowIdx = i;
+        break;
+      }
+    }
+    if (rowIdx < 0) return out({ ok: false, error: "row not found", model });
+
+    let nextCol = data[0].length;
+    const written = {};
+    for (const key of ALLOWED) {
+      if (fields[key] == null) continue;
+      let value = String(fields[key]).trim();
+      // A leading =, +, -, @ would be stored as a live formula; the
+      // apostrophe prefix forces a literal cell (not displayed).
+      if (/^[=+\-@]/.test(value)) value = "'" + value;
+      let col = headers.indexOf(key);
+      if (col < 0) {
+        col = nextCol;
+        headers.push(key);
+        sheet.getRange(1, col + 1).setValue(key.toUpperCase());
+        nextCol++;
+      }
+      sheet.getRange(rowIdx + 1, col + 1).setValue(value);
+      written[key] = value;
+    }
+    return out({ ok: true, model, updated: written });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
   }
 }
