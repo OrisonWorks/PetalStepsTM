@@ -333,38 +333,44 @@ function createReceipt(body, out) {
       "NO", "DATE", "CLIENT", "PHONE", "ITEMS", "AMOUNT",
       "WORDS", "METHOD", "BALANCE", "NOTE", "KEY",
     ]);
-    // The tab may predate the KEY column — find or add the header, because
-    // sheetRows_ only maps headed columns and an unheaded key would never
-    // match a lookup.
-    let keyCol = -1;
-    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    for (let c = 0; c < header.length; c++) {
-      if (String(header[c]).trim().toLowerCase() === "key") keyCol = c;
-    }
-    if (keyCol < 0) {
-      keyCol = header.length;
-      sheet.getRange(1, keyCol + 1).setValue("KEY");
-    }
+    // Write every field under its own header — a pre-existing tab may be
+    // missing KEY or have columns in a different order, and positional
+    // writes would land values under the wrong headers. One setValues
+    // call keeps the write atomic: no half-written receipt on failure.
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map((h) => String(h).trim().toLowerCase());
+    const colOf = (name) => {
+      let col = header.indexOf(name);
+      if (col < 0) {
+        col = header.length;
+        header.push(name);
+        sheet.getRange(1, col + 1).setValue(name.toUpperCase());
+      }
+      return col;
+    };
     const no =
       "PS-" + String(sheet.getLastRow()).padStart(4, "0");
     // Unguessable per-receipt key — the public /receipt/<no>?k=<key> link
     // needs it, so sequential numbers can't be enumerated.
     const key = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
-    const row = [
-      no,
-      new Date(),
-      safe_(f.client),
-      safe_(f.phone || ""),
-      safe_(String(f.items || "")).slice(0, 1500),
-      amount,
-      safe_(String(f.words || "")).slice(0, 200),
-      safe_(String(f.method || "")),
-      safe_(String(f.balance || "")),
-      safe_(String(f.note || "")).slice(0, 300),
-    ];
+    const row = [];
+    const put = (name, value) => {
+      row[colOf(name)] = value;
+    };
+    put("no", no);
+    put("date", new Date());
+    put("client", safe_(f.client));
+    put("phone", safe_(f.phone || ""));
+    put("items", safe_(String(f.items || "")).slice(0, 1500));
+    put("amount", amount);
+    put("words", safe_(String(f.words || "")).slice(0, 200));
+    put("method", safe_(String(f.method || "")));
+    put("balance", safe_(String(f.balance || "")));
+    put("note", safe_(String(f.note || "")).slice(0, 300));
+    put("key", key);
+    for (let c = 0; c < row.length; c++) if (row[c] === undefined) row[c] = "";
     const rowNum = sheet.getLastRow() + 1;
     sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
-    sheet.getRange(rowNum, keyCol + 1).setValue(key);
     return out({ ok: true, no, key });
   } finally {
     SpreadsheetApp.flush();
