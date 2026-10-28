@@ -145,9 +145,19 @@ export default function AdminPage() {
       <div className="mt-6 space-y-3">
         {products.map((p) => (
           <section key={p.sku} className="rounded-2xl border border-rose-100 bg-white p-4">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <h2 className="font-semibold text-stone-800">{p.name}</h2>
-              <span className="text-xs text-stone-400">{p.sku} · K{p.price}</span>
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.img}
+                alt={p.name}
+                className="h-16 w-16 shrink-0 rounded-xl border border-rose-100 object-cover"
+              />
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <h2 className="font-semibold text-stone-800">{p.name}</h2>
+                <span className="text-xs text-stone-400">
+                  {p.sku} · {p.color} · K{p.price}
+                </span>
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {Array.from({ length: 11 }, (_, i) => 35 + i).map((size) => {
