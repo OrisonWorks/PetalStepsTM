@@ -249,8 +249,10 @@ function appendLog_(action, model, size, note) {
       size == null ? "" : safe_(size),
       safe_(note || ""),
     ]);
+    return true;
   } catch (err) {
     // deliberately swallowed — see comment above
+    return false;
   }
 }
 
@@ -300,8 +302,11 @@ function logEvent(body, out) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
   try {
-    appendLog_(event, model, body.size || "",
+    const logged = appendLog_(event, model, body.size || "",
       safe_(String(body.note || "")).slice(0, 300));
+    // Unlike stock writes (which must not fail on a log failure), an
+    // interest event IS the log write — report it honestly.
+    if (!logged) return out({ ok: false, error: "log write failed" });
     return out({ ok: true });
   } finally {
     SpreadsheetApp.flush();
@@ -328,12 +333,24 @@ function createReceipt(body, out) {
       "NO", "DATE", "CLIENT", "PHONE", "ITEMS", "AMOUNT",
       "WORDS", "METHOD", "BALANCE", "NOTE", "KEY",
     ]);
+    // The tab may predate the KEY column — find or add the header, because
+    // sheetRows_ only maps headed columns and an unheaded key would never
+    // match a lookup.
+    let keyCol = -1;
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (let c = 0; c < header.length; c++) {
+      if (String(header[c]).trim().toLowerCase() === "key") keyCol = c;
+    }
+    if (keyCol < 0) {
+      keyCol = header.length;
+      sheet.getRange(1, keyCol + 1).setValue("KEY");
+    }
     const no =
       "PS-" + String(sheet.getLastRow()).padStart(4, "0");
     // Unguessable per-receipt key — the public /receipt/<no>?k=<key> link
     // needs it, so sequential numbers can't be enumerated.
     const key = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
-    sheet.appendRow([
+    const row = [
       no,
       new Date(),
       safe_(f.client),
@@ -344,8 +361,10 @@ function createReceipt(body, out) {
       safe_(String(f.method || "")),
       safe_(String(f.balance || "")),
       safe_(String(f.note || "")).slice(0, 300),
-      key,
-    ]);
+    ];
+    const rowNum = sheet.getLastRow() + 1;
+    sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
+    sheet.getRange(rowNum, keyCol + 1).setValue(key);
     return out({ ok: true, no, key });
   } finally {
     SpreadsheetApp.flush();
