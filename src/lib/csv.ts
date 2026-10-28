@@ -1,6 +1,9 @@
 // Minimal RFC-4180 CSV reader: handles quoted cells, embedded commas,
 // escaped quotes ("") and CRLF. No dependencies — runs in the browser.
 export function parseCsv(text: string): string[][] {
+  // Excel exports a UTF-8 BOM; leaving it on the first header cell breaks
+  // column matching ("\uFEFFmodel" !== "model").
+  text = text.replace(/^\uFEFF/, "");
   const rows: string[][] = [];
   let field = "";
   let row: string[] = [];

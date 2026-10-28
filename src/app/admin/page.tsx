@@ -364,6 +364,8 @@ type CsvItem = {
   desc: string;
   sizes: { size: number; count: number }[];
   error?: string;
+  done?: boolean;
+  serverError?: string;
 };
 
 // Header lookup with aliases; size columns match "EU38", "eu38" or bare "38".
@@ -410,10 +412,13 @@ function csvToItem(row: string[], cols: Map<string, number>): CsvItem {
   return item;
 }
 
+const BATCH_SIZE = 200; // matches MAX_ITEMS on /api/admin/create-products
+
 function BulkImport({ onDone }: { onDone: () => void }) {
   const [items, setItems] = useState<CsvItem[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<{ model: string; ok: boolean; error?: string }[] | null>(null);
 
   const downloadTemplate = () => {
@@ -448,28 +453,52 @@ function BulkImport({ onDone }: { onDone: () => void }) {
 
   const importItems = async () => {
     if (!items) return;
-    const good = items.filter((i) => !i.error);
-    if (good.length === 0) return;
+    // Only rows that haven't succeeded — retrying a created model just
+    // earns a "model already exists" rejection.
+    const pending = items.filter((i) => !i.error && !i.done);
+    if (pending.length === 0) return;
     setImporting(true);
+    setProgress(0);
+    const allResults: { model: string; ok: boolean; error?: string }[] = [];
     try {
-      const res = await fetch("/api/admin/create-products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: good }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.ok) {
-        toast.error(d.error || "Import failed");
-        return;
+      // The API caps at 200 items per request — chunk bigger files.
+      for (let off = 0; off < pending.length; off += BATCH_SIZE) {
+        const res = await fetch("/api/admin/create-products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: pending.slice(off, off + BATCH_SIZE) }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.ok) {
+          toast.error(d.error || "Import failed");
+          return;
+        }
+        allResults.push(...(d.results || []));
+        setProgress(Math.min(off + BATCH_SIZE, pending.length));
       }
-      const failed = (d.results || []).filter((r: { ok: boolean }) => !r.ok);
-      setResults(d.results || []);
-      if (failed.length === 0) {
-        toast.success(`${d.created} styles added — live on the shop in ~a minute`);
-        setItems(null);
-        onDone();
+      const byModel = new Map(allResults.map((r) => [r.model, r]));
+      // Merge per-model results across retries and mark rows on screen.
+      setResults((prev) => {
+        const merged = new Map((prev || []).map((r) => [r.model, r]));
+        allResults.forEach((r) => merged.set(r.model, r));
+        return [...merged.values()];
+      });
+      const next = items.map((it) => {
+        const r = byModel.get(it.sku);
+        if (!r) return it;
+        return r.ok ? { ...it, done: true, serverError: undefined } : { ...it, serverError: r.error };
+      });
+      setItems(next);
+      const failed = allResults.filter((r) => !r.ok).length;
+      const left = next.filter((i) => !i.error && !i.done).length;
+      if (failed === 0) {
+        toast.success(`${allResults.length} styles added — live on the shop in ~a minute`);
+        if (left === 0) {
+          setItems(null);
+          onDone();
+        }
       } else {
-        toast.error(`${d.created} added, ${failed.length} failed — see below`);
+        toast.error(`${allResults.length - failed} added, ${failed} failed — see below`);
       }
     } catch {
       toast.error("Import failed");
@@ -478,7 +507,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const valid = items?.filter((i) => !i.error).length ?? 0;
+  const valid = items?.filter((i) => !i.error && !i.done).length ?? 0;
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-5">
@@ -521,8 +550,12 @@ function BulkImport({ onDone }: { onDone: () => void }) {
                     <td className="px-3 py-2">{it.name || "—"}</td>
                     <td className="px-3 py-2">{it.price ? `K${it.price}` : "—"}</td>
                     <td className="px-3 py-2">{it.sizes.reduce((n, s) => n + s.count, 0)}</td>
-                    <td className={`px-3 py-2 ${it.error ? "text-red-600" : "text-emerald-600"}`}>
-                      {it.error || "ready"}
+                    <td
+                      className={`px-3 py-2 ${
+                        it.done ? "text-emerald-600" : it.error || it.serverError ? "text-red-600" : "text-stone-500"
+                      }`}
+                    >
+                      {it.done ? "added" : it.error || it.serverError || "ready"}
                     </td>
                   </tr>
                 ))}
@@ -535,10 +568,12 @@ function BulkImport({ onDone }: { onDone: () => void }) {
             onClick={importItems}
             className="mt-3 rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
           >
-            {importing ? "Importing…" : `Import ${valid} style${valid === 1 ? "" : "s"}`}
+            {importing
+              ? `Importing ${progress}/${items.filter((i) => !i.error && !i.done).length}…`
+              : `Import ${valid} style${valid === 1 ? "" : "s"}`}
           </button>
-          {valid < items.length && (
-            <p className="mt-2 text-xs text-stone-400">{items.length - valid} row(s) skipped — fix them in the CSV and re-upload.</p>
+          {valid < items.filter((i) => !i.done).length && (
+            <p className="mt-2 text-xs text-stone-400">{items.filter((i) => !i.done).length - valid} row(s) skipped — fix them in the CSV and re-upload.</p>
           )}
         </div>
       )}
