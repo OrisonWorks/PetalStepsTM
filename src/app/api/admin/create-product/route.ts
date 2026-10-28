@@ -28,12 +28,16 @@ export async function POST(req: Request) {
   if (!name) {
     return NextResponse.json({ ok: false, error: "name required" }, { status: 400 });
   }
-  // The sheet parser strips non-digits from prices — "450.50" would come
-  // back as 45050. Normalize to the integer ZMW string before writing.
-  const priceDigits = String(body.price || "").trim().replace(/[^0-9]/g, "");
-  if (!(parseInt(priceDigits, 10) > 0)) {
-    return NextResponse.json({ ok: false, error: "price must be a positive number" }, { status: 400 });
+  // Accept only unsigned integer ZMW — "-450" would lose its sign and
+  // "450.50" would come back through the parser as 45050.
+  const priceRaw = String(body.price || "").trim();
+  if (!/^\d{1,7}$/.test(priceRaw) || !(parseInt(priceRaw, 10) > 0)) {
+    return NextResponse.json(
+      { ok: false, error: "price must be a positive whole number" },
+      { status: 400 }
+    );
   }
+  const priceDigits = priceRaw;
   // Parser only tracks EU 35–45; accepting outside sizes would create a
   // style the shop can never show.
   const sizes = (Array.isArray(body.sizes) ? body.sizes : [])
