@@ -340,7 +340,9 @@ function createReceipt(body, out) {
     const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
       .map((h) => String(h).trim().toLowerCase());
     const colOf = (name) => {
-      let col = header.indexOf(name);
+      // lastIndexOf matches sheetRows_, which lets the last duplicate
+      // header win — writing the first would leave the read column empty.
+      let col = header.lastIndexOf(name);
       if (col < 0) {
         col = header.length;
         header.push(name);
