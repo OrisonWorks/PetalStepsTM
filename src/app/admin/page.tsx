@@ -5,6 +5,7 @@ import type { Product } from "@/lib/products";
 import { totalPairs } from "@/lib/products";
 import { amountInWords } from "@/lib/money-words";
 import { waLink } from "@/lib/utils";
+import { parseCsv } from "@/lib/csv";
 
 const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
 
@@ -345,6 +346,269 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+const EU_SIZES = Array.from({ length: 11 }, (_, i) => 35 + i);
+const TEMPLATE_HEADER = ["model", "name", "colour", "price", "category", "photo", "description", ...EU_SIZES.map((s) => `EU${s}`)];
+const TEMPLATE_ROW = ["18085-33", "Apricot Floral Heel", "Apricot", "450", "matte", "/products/image1.jpg", "", "", "", "", "2", "2", "1", "", "", "", "", ""];
+
+function csvField(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+type CsvItem = {
+  sku: string;
+  name: string;
+  color: string;
+  price: string;
+  cat: string;
+  img: string;
+  desc: string;
+  sizes: { size: number; count: number }[];
+  error?: string;
+  done?: boolean;
+  serverError?: string;
+};
+
+// Header lookup with aliases; size columns match "EU38", "eu38" or bare "38".
+function columnMap(header: string[]): Map<string, number> {
+  const map = new Map<string, number>();
+  header.forEach((h, i) => {
+    const key = h.trim().toLowerCase().replace(/^eu\s*/, "");
+    if (!map.has(key)) map.set(key, i);
+  });
+  return map;
+}
+
+function csvToItem(row: string[], cols: Map<string, number>): CsvItem {
+  const get = (names: string[]) => {
+    for (const n of names) {
+      const i = cols.get(n);
+      if (i !== undefined) return (row[i] || "").trim();
+    }
+    return "";
+  };
+  const item: CsvItem = {
+    sku: get(["model", "sku", "code", "style"]),
+    name: get(["name", "title"]),
+    color: get(["colour", "color"]),
+    price: get(["price", "k"]),
+    cat: get(["category", "cat"]),
+    img: get(["photo", "img", "image"]),
+    desc: get(["description", "desc"]),
+    sizes: EU_SIZES.map((size) => ({
+      size,
+      count: Math.max(0, parseInt(get([String(size)]), 10) || 0),
+    })).filter((s) => s.count > 0),
+  };
+  // Same rules the server enforces, so bad rows are flagged before upload.
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{1,29}$/.test(item.sku)) {
+    item.error = "bad style code";
+  } else if (!item.name) {
+    item.error = "name required";
+  } else if (!/^\d{1,7}$/.test(item.price) || !(parseInt(item.price, 10) > 0)) {
+    item.error = "price must be a positive whole number";
+  } else if (item.sizes.length === 0) {
+    item.error = "no stock in any EU35–45 column";
+  }
+  return item;
+}
+
+const BATCH_SIZE = 200; // matches MAX_ITEMS on /api/admin/create-products
+
+function BulkImport({ onDone }: { onDone: () => void }) {
+  const [items, setItems] = useState<CsvItem[] | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState<{ model: string; ok: boolean; error?: string }[] | null>(null);
+
+  const downloadTemplate = () => {
+    const csv = [TEMPLATE_HEADER, TEMPLATE_ROW].map((r) => r.map(csvField).join(",")).join("\n") + "\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "petalsteps-stock-template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setFileName(file.name);
+    setResults(null);
+    const rows = parseCsv(await file.text());
+    if (rows.length < 2) {
+      toast.error("No data rows — need a header row plus at least one style");
+      setItems(null);
+      return;
+    }
+    const cols = columnMap(rows[0]);
+    if (![..."model,sku,code,style".split(",")].some((n) => cols.has(n)) || !cols.has("name") && !cols.has("title")) {
+      toast.error("Header row needs at least a model and a name column");
+      setItems(null);
+      return;
+    }
+    const parsed = rows.slice(1).map((r) => csvToItem(r, cols));
+    // A second row with the same code would always lose to the first — the
+    // writer creates one then rejects the rest as "model already exists".
+    const seen = new Set<string>();
+    parsed.forEach((it) => {
+      if (it.error) return;
+      if (seen.has(it.sku)) it.error = "duplicate style code in file";
+      seen.add(it.sku);
+    });
+    setItems(parsed);
+  };
+
+  const importItems = async () => {
+    if (!items) return;
+    // Only rows that haven't succeeded — retrying a created model just
+    // earns a "model already exists" rejection.
+    const pendingIdx = items
+      .map((it, i) => ({ it, i }))
+      .filter(({ it }) => !it.error && !it.done)
+      .map(({ i }) => i);
+    if (pendingIdx.length === 0) return;
+    setImporting(true);
+    setProgress(0);
+    // Track rows by position, not model code (duplicates share a code), and
+    // apply each batch's results immediately so a later failure can't drop
+    // rows that already landed on the sheet.
+    let current = [...items];
+    let added = 0;
+    let failed = 0;
+    let aborted = false;
+    try {
+      // The API caps at 200 items per request — chunk bigger files.
+      for (let off = 0; off < pendingIdx.length; off += BATCH_SIZE) {
+        const batchIdx = pendingIdx.slice(off, off + BATCH_SIZE);
+        const res = await fetch("/api/admin/create-products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: batchIdx.map((i) => current[i]) }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.ok) {
+          toast.error(d.error || "Import failed");
+          aborted = true;
+          break;
+        }
+        const batchResults: { model: string; ok: boolean; error?: string }[] = d.results || [];
+        // results[i] answers items[i] — zip by position, never by model.
+        batchResults.forEach((r, pos) => {
+          const rowIdx = batchIdx[pos];
+          if (rowIdx === undefined) return;
+          current[rowIdx] = r.ok
+            ? { ...current[rowIdx], done: true, serverError: undefined }
+            : { ...current[rowIdx], serverError: r.error };
+          if (r.ok) added++;
+          else failed++;
+        });
+        setItems([...current]);
+        setResults((prev) => [...(prev || []), ...batchResults]);
+        setProgress(Math.min(off + BATCH_SIZE, pendingIdx.length));
+      }
+      const left = current.filter((i) => !i.error && !i.done).length;
+      if (!aborted && failed === 0) {
+        toast.success(`${added} styles added — live on the shop in ~a minute`);
+        if (left === 0) {
+          setItems(null);
+          onDone();
+        }
+      } else if (!aborted) {
+        toast.error(`${added} added, ${failed} failed — see below`);
+      }
+    } catch {
+      toast.error("Import failed");
+      setItems([...current]);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const valid = items?.filter((i) => !i.error && !i.done).length ?? 0;
+
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-5">
+      <p className="text-sm font-semibold text-stone-700">Bulk import from CSV</p>
+      <p className="mt-1 text-sm text-stone-500">
+        Adding a whole delivery? Fill the template in Google Sheets or Excel
+        (File → Download → CSV) and upload it here — one row per style.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+        >
+          Download template
+        </button>
+        <label className="cursor-pointer rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+          Choose CSV…
+          <input type="file" accept=".csv,text/csv" onChange={onFile} className="hidden" />
+        </label>
+        {fileName && <span className="text-xs text-stone-400">{fileName}</span>}
+      </div>
+      {items && items.length > 0 && (
+        <div className="mt-4">
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-stone-100">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-stone-50 text-stone-500">
+                <tr>
+                  <th className="px-3 py-2">Style code</th>
+                  <th className="px-3 py-2">Name</th>
+                  <th className="px-3 py-2">Price</th>
+                  <th className="px-3 py-2">Pairs</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, i) => (
+                  <tr key={i} className="border-t border-stone-100">
+                    <td className="px-3 py-2 font-mono">{it.sku || "—"}</td>
+                    <td className="px-3 py-2">{it.name || "—"}</td>
+                    <td className="px-3 py-2">{it.price ? `K${it.price}` : "—"}</td>
+                    <td className="px-3 py-2">{it.sizes.reduce((n, s) => n + s.count, 0)}</td>
+                    <td
+                      className={`px-3 py-2 ${
+                        it.done ? "text-emerald-600" : it.error || it.serverError ? "text-red-600" : "text-stone-500"
+                      }`}
+                    >
+                      {it.done ? "added" : it.error || it.serverError || "ready"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            disabled={importing || valid === 0}
+            onClick={importItems}
+            className="mt-3 rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
+          >
+            {importing
+              ? `Importing ${progress}/${items.filter((i) => !i.error && !i.done).length}…`
+              : `Import ${valid} style${valid === 1 ? "" : "s"}`}
+          </button>
+          {valid < items.filter((i) => !i.done).length && (
+            <p className="mt-2 text-xs text-stone-400">{items.filter((i) => !i.done).length - valid} row(s) skipped — fix them in the CSV and re-upload.</p>
+          )}
+        </div>
+      )}
+      {results && (
+        <ul className="mt-3 space-y-1 text-xs">
+          {results.map((r, i) => (
+            <li key={i} className={r.ok ? "text-emerald-600" : "text-red-600"}>
+              {r.model}: {r.ok ? "added" : r.error}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function EditForm({
   product,
   onSaved,
@@ -620,6 +884,14 @@ export default function AdminPage() {
               setView("stock");
             }}
           />
+          <div className="mt-4">
+            <BulkImport
+              onDone={async () => {
+                await loadProducts();
+                setView("stock");
+              }}
+            />
+          </div>
         </div>
       )}
       {view === "reports" && <div className="mt-6"><ReportsPanel /></div>}
