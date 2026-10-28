@@ -16,6 +16,22 @@
  *   - `fields` may set: name, price, category, description, photo, colour,
  *     active. Columns are created if missing; only provided keys are written,
  *     always to the model's first row (the site reads first non-empty value).
+ * POST JSON body: { token, action: "logEvent", event, model, size?, note? }
+ *   - Appends a row to the LOG tab: TS, ACTION, MODEL, SIZE, NOTE.
+ *     event is "interest" (client tapped order on WhatsApp); sold/restock
+ *     writes are logged automatically.
+ * POST JSON body: { token, action: "createReceipt", fields }
+ *   - Appends to the RECEIPTS tab and returns an auto-numbered PS-#### id.
+ * POST JSON body: { token, action: "sendReceiptEmail", email, subject, body }
+ *   - Sends the receipt text via MailApp (to the address given).
+ * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
+ * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
+ *
+ * Time-driven triggers (install once via the clock icon):
+ *   dailyDigest()  — emails the day's sales/interest summary
+ *   backupSheet()  — emails every tab as CSV attachments
+ * Both mail REPORT_EMAIL (Script Property) or fall back to the owner.
+ *
  * Stock-take layout (one row per size): finds every row matching MODEL+SIZE,
  * treats the summed COUNT as the live count, writes the new count to the first
  * row and zeroes duplicates. Restocking a size with no row appends one.
@@ -39,6 +55,10 @@ function doPost(e) {
 
     if (body.action === "updateProduct")
       return updateProduct(body, out);
+    if (body.action === "logEvent") return logEvent(body, out);
+    if (body.action === "createReceipt") return createReceipt(body, out);
+    if (body.action === "sendReceiptEmail")
+      return sendReceiptEmail(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -90,6 +110,7 @@ function doPost(e) {
           newRow[countCol] = applySet;
           newRow[modelCol] = model;
           sheet.appendRow(newRow);
+          appendLog_("restock", model, size, "0→" + applySet);
           return out({
             ok: true,
             model,
@@ -124,6 +145,8 @@ function doPost(e) {
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
+      appendLog_(next < current ? "sold" : "restock", model, size,
+        current + "→" + next);
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
       SpreadsheetApp.flush();
@@ -198,4 +221,265 @@ function updateProduct(body, out) {
     SpreadsheetApp.flush();
     lock.releaseLock();
   }
+}
+
+// ---------- shared helpers ----------
+
+// Finds a tab by name, creating it with the given header row when missing.
+function getOrCreate_(ss, name, headers) {
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE.
+function appendLog_(action, model, size, note) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getOrCreate_(ss, "LOG", ["TS", "ACTION", "MODEL", "SIZE", "NOTE"]);
+  sheet.appendRow([new Date(), action, model, size == null ? "" : size, note || ""]);
+}
+
+// Prefixes formula-leading characters so values can't execute in the sheet.
+function safe_(value) {
+  let v = String(value).trim();
+  if (/^[=+\-@]/.test(v)) v = "'" + v;
+  return v;
+}
+
+// Returns a tab's data rows as objects keyed by header name.
+function sheetRows_(ss, name) {
+  const sheet = ss.getSheetByName(name);
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+  const headers = data[0].map((h) => String(h).trim().toLowerCase());
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = {};
+    headers.forEach((h, c) => {
+      row[h] = data[i][c] instanceof Date
+        ? Utilities.formatDate(
+            data[i][c],
+            Session.getScriptTimeZone(),
+            "yyyy-MM-dd'T'HH:mm:ss"
+          )
+        : String(data[i][c]);
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ---------- event log ----------
+
+// POST { action: "logEvent", event, model, size?, note? }
+// "interest" events come from public site taps; sold/restock are written
+// automatically by the stock path — those events are accepted here too only
+// so the API surface stays simple; the app never sends them directly.
+function logEvent(body, out) {
+  const event = String(body.event || "").trim();
+  const model = String(body.model || "").trim();
+  if (!["interest", "sold", "restock"].includes(event))
+    return out({ ok: false, error: "unknown event" });
+  if (!model) return out({ ok: false, error: "model required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    appendLog_(event, model, body.size || "",
+      safe_(String(body.note || "")).slice(0, 300));
+    return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+// ---------- receipts ----------
+
+// POST { action: "createReceipt", fields: { client, phone, items, amount,
+// words, method, balance, note } } → { ok, no: "PS-0007" }
+// items is a plain-text lines blob; words is amount-in-words (site-generated).
+function createReceipt(body, out) {
+  const f = body.fields || {};
+  const amount = parseInt(String(f.amount || "").replace(/[^0-9]/g, ""), 10);
+  if (!(amount > 0)) return out({ ok: false, error: "amount must be positive" });
+  if (!String(f.client || "").trim())
+    return out({ ok: false, error: "client name required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreate_(ss, "RECEIPTS", [
+      "NO", "DATE", "CLIENT", "PHONE", "ITEMS", "AMOUNT",
+      "WORDS", "METHOD", "BALANCE", "NOTE",
+    ]);
+    const no =
+      "PS-" + String(sheet.getLastRow()).padStart(4, "0");
+    sheet.appendRow([
+      no,
+      new Date(),
+      safe_(f.client),
+      safe_(f.phone || ""),
+      safe_(String(f.items || "")).slice(0, 1500),
+      amount,
+      safe_(String(f.words || "")).slice(0, 200),
+      safe_(String(f.method || "")),
+      safe_(String(f.balance || "")),
+      safe_(String(f.note || "")).slice(0, 300),
+    ]);
+    return out({ ok: true, no });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+// POST { action: "sendReceiptEmail", email, subject, body }
+function sendReceiptEmail(body, out) {
+  const email = String(body.email || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    return out({ ok: false, error: "valid email required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    MailApp.sendEmail(
+      email,
+      safe_(String(body.subject || "Petal Steps receipt")).slice(0, 200),
+      String(body.body || "").slice(0, 8000)
+    );
+    return out({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------- read endpoints ----------
+
+// GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001
+function doGet(e) {
+  const out = (o) =>
+    ContentService.createTextOutput(JSON.stringify(o)).setMimeType(
+      ContentService.MimeType.JSON
+    );
+  try {
+    const p = (e && e.parameter) || {};
+    const token = PropertiesService.getScriptProperties().getProperty(
+      "STOCK_TOKEN"
+    );
+    if (!token || p.token !== token)
+      return out({ ok: false, error: "unauthorized" });
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const kind = String(p.kind || "");
+    if (kind === "log") {
+      const n = Math.min(1000, parseInt(p.n || "300", 10) || 300);
+      const rows = sheetRows_(ss, "LOG");
+      return out({ ok: true, rows: rows.slice(-n) });
+    }
+    if (kind === "receipt") {
+      const no = String(p.no || "").trim();
+      if (!no) return out({ ok: false, error: "no required" });
+      const row = sheetRows_(ss, "RECEIPTS").find((r) => r.no === no);
+      if (!row) return out({ ok: false, error: "not found" });
+      return out({ ok: true, receipt: row });
+    }
+    return out({ ok: false, error: "unknown kind" });
+  } catch (err) {
+    return out({ ok: false, error: String(err) });
+  }
+}
+
+// ---------- scheduled jobs (install as time-driven triggers) ----------
+
+// Emails today's sales + interest summary. Daily trigger, e.g. 21:00.
+function dailyDigest() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tz = Session.getScriptTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  const rows = sheetRows_(ss, "LOG").filter((r) =>
+    String(r.ts).indexOf(today) === 0
+  );
+  const sales = rows.filter((r) => r.action === "sold");
+  const interest = rows.filter((r) => r.action === "interest");
+  const restock = rows.filter((r) => r.action === "restock");
+  const receipts = sheetRows_(ss, "RECEIPTS").filter((r) =>
+    String(r.date).indexOf(today) === 0
+  );
+  const perModel = {};
+  sales.forEach((r) => {
+    perModel[r.model] = (perModel[r.model] || 0) + 1;
+  });
+  const lines = Object.keys(perModel)
+    .sort()
+    .map((m) => "  " + m + "  ×  " + perModel[m]);
+  const revenue = receipts.reduce(
+    (sum, r) => sum + (parseInt(String(r.amount), 10) || 0),
+    0
+  );
+  const text =
+    "Petal Steps — " +
+    today +
+    "\n\nPairs marked sold: " +
+    sales.length +
+    (lines.length ? "\n" + lines.join("\n") : "\n  (none)") +
+    "\n\nReceipts issued: " +
+    receipts.length +
+    " (K" +
+    revenue.toLocaleString() +
+    ")" +
+    "\nInterest taps on WhatsApp order: " +
+    interest.length +
+    "\nRestocks: " +
+    restock.length +
+    "\n\n— Petal Steps shop";
+  MailApp.sendEmail(
+    reportEmail_(),
+    "Petal Steps — daily sales " + today,
+    text
+  );
+}
+
+// Emails every tab as CSV attachments. Daily or weekly trigger.
+function backupSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const date = Utilities.formatDate(
+    new Date(),
+    Session.getScriptTimeZone(),
+    "yyyy-MM-dd"
+  );
+  const attachments = ss.getSheets().map((sh) => {
+    const csv = sh
+      .getDataRange()
+      .getValues()
+      .map((row) => row.map(csvCell_).join(","))
+      .join("\n");
+    return Utilities.newBlob(
+      csv,
+      "text/csv",
+      ss.getName() + "-" + sh.getName() + "-" + date + ".csv"
+    );
+  });
+  MailApp.sendEmail(
+    reportEmail_(),
+    "Petal Steps — sheet backup " + date,
+    "CSV export of every tab is attached. To restore, re-import the CSV(s) into the sheet.",
+    { attachments: attachments }
+  );
+}
+
+function reportEmail_() {
+  return (
+    PropertiesService.getScriptProperties().getProperty("REPORT_EMAIL") ||
+    Session.getActiveUser().getEmail()
+  );
+}
+
+function csvCell_(v) {
+  const s =
+    v instanceof Date
+      ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
+      : String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }

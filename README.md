@@ -70,6 +70,26 @@ Each style also has an **Edit** button that opens a form for name, colour, price
 
 To change the passcode or token later: update the env vars and redeploy (the script keeps running — `STOCK_TOKEN` must match `STOCK_WRITER_TOKEN`).
 
+### Reports, receipts and backups
+
+`/admin` has three tabs:
+
+- **Stock** — the size grid described above.
+- **Reports** — a per-day breakdown of pairs marked sold per model, WhatsApp-order "interest" taps (logged when a client taps *Send order on WhatsApp* in their bag), and restocks. Data comes from a `LOG` tab the script auto-creates in the same spreadsheet.
+- **Receipts** — generate a numbered receipt (`PS-0001`, `PS-0002`, …) matching the shop's printed receipt pad: client name, items (quick-add from live stock), amount with amount-in-words auto-fill, method and balance. Receipts are stored in a `RECEIPTS` tab and each gets a public shareable link (`/receipt/PS-0001`) you can send the client via WhatsApp or email — the form's *Send via WhatsApp* button opens the chat with the link, and entering a client email sends them a copy automatically. Interim receipts until ZRA smart invoicing is integrated.
+
+### Daily email digest + sheet backup (one-time trigger setup)
+
+Two scheduled functions live in `stock_writer.gs`. Install them once:
+
+1. Apps Script → **Triggers (⏰ clock icon, left rail)** → **+ Add Trigger**:
+   - `dailyDigest` → event source **Time-driven** → **Day timer** → pick an evening slot (e.g. 21:00–22:00). Emails the day's sold/restock/interest counts and receipt revenue.
+   - `backupSheet` → **Time-driven** → **Week timer** (or Day timer for daily backups) → pick a time. Emails every tab as CSV attachments.
+2. Both email the address in Script Property `REPORT_EMAIL` if set, otherwise the script owner's Gmail. Add `REPORT_EMAIL` under Script Properties to override.
+3. First run asks for Gmail/send-mail authorization — approve once.
+
+> Apps Script web apps serve the deployed version, not the latest saved code. After updating `stock_writer.gs` you must redeploy: **Deploy → Manage deployments → ✎ → Version: New version → Deploy**. The `/exec` URL stays the same.
+
 ## Deploy (Vercel)
 
 1. Push this repo to GitHub (already at `OrisonWorks/PetalStepsTM`).
