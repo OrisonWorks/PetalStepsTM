@@ -24,7 +24,7 @@ export function CartDrawer() {
       fetch("/api/log-interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty} · ${form.phone || "no number"}` }),
+        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty}` }),
         keepalive: true,
       }).catch(() => {})
     );

@@ -235,11 +235,23 @@ function getOrCreate_(ss, name, headers) {
   return sheet;
 }
 
-// Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE.
+// Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE. Never throws — a
+// failed log must not fail the stock write it trails (a reported failure
+// would invite a retry that double-counts the sale).
 function appendLog_(action, model, size, note) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = getOrCreate_(ss, "LOG", ["TS", "ACTION", "MODEL", "SIZE", "NOTE"]);
-  sheet.appendRow([new Date(), action, model, size == null ? "" : size, note || ""]);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreate_(ss, "LOG", ["TS", "ACTION", "MODEL", "SIZE", "NOTE"]);
+    sheet.appendRow([
+      new Date(),
+      safe_(action),
+      safe_(model),
+      size == null ? "" : safe_(size),
+      safe_(note || ""),
+    ]);
+  } catch (err) {
+    // deliberately swallowed — see comment above
+  }
 }
 
 // Prefixes formula-leading characters so values can't execute in the sheet.
@@ -314,10 +326,13 @@ function createReceipt(body, out) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = getOrCreate_(ss, "RECEIPTS", [
       "NO", "DATE", "CLIENT", "PHONE", "ITEMS", "AMOUNT",
-      "WORDS", "METHOD", "BALANCE", "NOTE",
+      "WORDS", "METHOD", "BALANCE", "NOTE", "KEY",
     ]);
     const no =
       "PS-" + String(sheet.getLastRow()).padStart(4, "0");
+    // Unguessable per-receipt key — the public /receipt/<no>?k=<key> link
+    // needs it, so sequential numbers can't be enumerated.
+    const key = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
     sheet.appendRow([
       no,
       new Date(),
@@ -329,8 +344,9 @@ function createReceipt(body, out) {
       safe_(String(f.method || "")),
       safe_(String(f.balance || "")),
       safe_(String(f.note || "")).slice(0, 300),
+      key,
     ]);
-    return out({ ok: true, no });
+    return out({ ok: true, no, key });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();
@@ -375,14 +391,22 @@ function doGet(e) {
     const kind = String(p.kind || "");
     if (kind === "log") {
       const n = Math.min(1000, parseInt(p.n || "300", 10) || 300);
-      const rows = sheetRows_(ss, "LOG");
+      const day = String(p.day || "");
+      // Filter by day BEFORE the row cap so older days don't fall off the
+      // tail of the log.
+      let rows = sheetRows_(ss, "LOG");
+      if (day) rows = rows.filter((r) => String(r.ts).indexOf(day) === 0);
       return out({ ok: true, rows: rows.slice(-n) });
     }
     if (kind === "receipt") {
       const no = String(p.no || "").trim();
-      if (!no) return out({ ok: false, error: "no required" });
-      const row = sheetRows_(ss, "RECEIPTS").find((r) => r.no === no);
+      const k = String(p.k || "").trim();
+      if (!no || !k) return out({ ok: false, error: "no and k required" });
+      const row = sheetRows_(ss, "RECEIPTS").find(
+        (r) => r.no === no && r.key === k
+      );
       if (!row) return out({ ok: false, error: "not found" });
+      delete row.key;
       return out({ ok: true, receipt: row });
     }
     return out({ ok: false, error: "unknown kind" });
@@ -481,5 +505,8 @@ function csvCell_(v) {
     v instanceof Date
       ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
       : String(v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  // Formula-leading values must survive re-import as literals, not become
+  // executable formulas in whatever sheet the backup is restored into.
+  const escaped = /^[=+\-@]/.test(s) ? "'" + s : s;
+  return /[",\n]/.test(escaped) ? '"' + escaped.replace(/"/g, '""') + '"' : escaped;
 }

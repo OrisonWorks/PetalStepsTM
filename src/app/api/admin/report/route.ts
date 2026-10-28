@@ -15,7 +15,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Stock writer not configured" }, { status: 503 });
   }
   const day = new URL(req.url).searchParams.get("day") || "";
+  // The day filter runs inside the writer so the row cap can't drop an
+  // older day's events behind newer ones.
   const qs = new URLSearchParams({ token, kind: "log", n: "800" });
+  if (day) qs.set("day", day);
   try {
     const res = await fetch(`${base}?${qs}`, { cache: "no-store" });
     const data = await res.json().catch(() => ({}));
@@ -25,10 +28,7 @@ export async function GET(req: Request) {
         { status: 502 }
       );
     }
-    const rows = (data.rows || []).filter(
-      (r: { ts?: string }) => !day || String(r.ts || "").startsWith(day)
-    );
-    return NextResponse.json({ ok: true, rows });
+    return NextResponse.json({ ok: true, rows: data.rows || [] });
   } catch {
     return NextResponse.json({ ok: false, error: "writer unreachable" }, { status: 502 });
   }
