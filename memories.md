@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Hide exact stock counts on the storefront (PR #30)
+
+- Client-side never shows exact pair counts for privacy: card badge reads "Only a few left" (≤5), card footer "In stock · SKU", shop header drops the pair total, hero swaps "Pairs available" for a "WhatsApp ordering" stat, quick-view size cells show "in stock"/"few left" (≤3), chatbot says "in stock"/"only a few left" instead of quoting numbers. Exact counts remain in the JSON payload (needed for in-stock detection) and fully visible in /admin.
+
 ### 2026-10-29 — Analytics: revenue trend, funnel, sell-through (PR #29)
 
 - **Revenue trend** — daily receipt totals now draw a third (emerald, own-scale) bar in the sales-trend card with a K-total in the header and a "revenue K" column in the CSV export.
