@@ -5,18 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCart } from "@/context/cart-context";
 import { cn, money } from "@/lib/utils";
-import { totalPairs, type Product } from "@/lib/products";
+import { type ClientProduct } from "@/lib/products";
 
-const CAT_LABEL: Record<Product["cat"], string> = { matte: "Matte", glossy: "Glossy", statement: "Statement", "red-bottom": "Red Bottom" };
+const CAT_LABEL: Record<ClientProduct["cat"], string> = { matte: "Matte", glossy: "Glossy", statement: "Statement", "red-bottom": "Red Bottom" };
 
-export function ProductCard({ product, onQuick }: { product: Product; onQuick: (p: Product) => void }) {
+export function ProductCard({ product, onQuick }: { product: ClientProduct; onQuick: (p: ClientProduct) => void }) {
   const { add } = useCart();
-  const pairs = totalPairs(product);
   return (
     <Card className="group flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10">
       <div className="relative cursor-pointer animate-pulse bg-rose-50" onClick={() => onQuick(product)}>
         <Image src={product.img} alt={product.name} width={700} height={860} sizes="(max-width: 1024px) 50vw, 25vw" className="h-[280px] w-full object-cover max-sm:h-52" />
-        {pairs <= 5 && <Badge className="absolute left-3 top-3">Only a few left</Badge>}
+        {product.lowStock && <Badge className="absolute left-3 top-3">Only a few left</Badge>}
         {product.cat === "red-bottom" && <Badge variant="new" className="absolute right-3 top-3">Red Bottom</Badge>}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
@@ -28,7 +27,7 @@ export function ProductCard({ product, onQuick }: { product: Product; onQuick: (
               key={s}
               className={cn(
                 "w-6 rounded-md border py-0.5 text-center text-[9px] font-bold",
-                (product.stock[s] ?? 0) > 0 ? "border-rose-300 bg-rose-50 text-rose-600" : "border-stone-100 bg-stone-50 text-stone-300"
+                product.stock[s] ? "border-rose-300 bg-rose-50 text-rose-600" : "border-stone-100 bg-stone-50 text-stone-300"
               )}
             >
               {s}

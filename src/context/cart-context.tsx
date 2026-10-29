@@ -1,12 +1,11 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { Product } from "@/lib/products";
+import type { ClientProduct } from "@/lib/products";
 
 export interface CartItem {
   key: string;
   id: number;
-  sku: string;
   name: string;
   price: number;
   img: string;
@@ -16,7 +15,7 @@ export interface CartItem {
 
 interface CartCtx {
   items: CartItem[];
-  add: (p: Product, size?: number) => void;
+  add: (p: ClientProduct, size?: number) => void;
   inc: (key: string) => void;
   dec: (key: string) => void;
   remove: (key: string) => void;
@@ -35,7 +34,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      setItems(JSON.parse(localStorage.getItem("petalCart") || "[]"));
+      // Re-key on load: carts saved before the SKU scrub keyed on id/sku.
+      const saved = JSON.parse(localStorage.getItem("petalCart") || "[]") as CartItem[];
+      setItems(saved.map((i) => ({ ...i, key: `${i.name}-${i.size}` })));
     } catch {}
   }, []);
 
@@ -43,14 +44,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("petalCart", JSON.stringify(items));
   }, [items]);
 
-  const add = useCallback((p: Product, size?: number) => {
+  const add = useCallback((p: ClientProduct, size?: number) => {
     const sizes = Object.keys(p.stock).map(Number).sort((a, b) => a - b);
     const s = size ?? sizes[Math.floor(sizes.length / 2)];
-    const key = `${p.id}-${s}`;
+    const key = `${p.name}-${s}`;
     setItems((prev) => {
       const found = prev.find((i) => i.key === key);
       if (found) return prev.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { key, id: p.id, sku: p.sku, name: p.name, price: p.price, img: p.img, size: s, qty: 1 }];
+      return [...prev, { key, id: p.id, name: p.name, price: p.price, img: p.img, size: s, qty: 1 }];
     });
     toast.success(`Added ${p.name} (EU ${s}) to your bag 🌸`);
   }, []);

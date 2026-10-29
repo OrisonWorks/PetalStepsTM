@@ -6,13 +6,13 @@ import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
 import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Marquee, MobileOrderBar, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
 import { Shop } from "@/components/Shop";
-import { type Filter, type Product } from "@/lib/products";
+import { type ClientProduct, type Filter } from "@/lib/products";
 
-export function HomeClient({ products }: { products: Product[] }) {
+export function HomeClient({ products }: { products: ClientProduct[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("featured");
-  const [quick, setQuick] = useState<Product | null>(null);
+  const [quick, setQuick] = useState<ClientProduct | null>(null);
   const [size, setSize] = useState<number | null>(null);
 
   const goFilter = useCallback((f: Filter) => {

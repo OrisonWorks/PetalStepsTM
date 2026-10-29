@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Scrub stock counts + SKU from the client payload (PR #33)
+
+- Public product data (`page.tsx` props and `/api/products` without `all=1`) is now `ClientProduct`: per-size `"in"|"low"` flags (≤3 = low) + `lowStock` (≤5 total), no `sku`, no counts — dev tools show nothing more than the UI does. Admin keeps full `Product` via `?all=1`.
+- Ordering identifies styles by **name**: the WhatsApp message and cart drop the code; `/api/log-interest` resolves name→SKU server-side so sheet LOG/leads/analytics stay SKU-based. Cart keys migrate on load.
+- Chatbot loses exact-SKU lookup (name/colour matching only); site search no longer matches SKU.
+
 ### 2026-10-29 — Hide the style SKU on the storefront (PR #32)
 
 - Same privacy rule as stock counts: clients see name + photo, never the model code. Removed from product card footer ("In stock"), quick view ("ZMW"), and bag line items. SKU still rides inside the WhatsApp order message (the store needs it to identify the style), still matches chatbot queries and site search invisibly, and is fully visible in /admin.

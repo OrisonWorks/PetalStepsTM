@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
-import type { Product } from "@/lib/products";
+import type { ClientProduct } from "@/lib/products";
 import { waLink } from "@/lib/utils";
 
 type Msg = { from: "bot" | "user"; text: string; link?: { label: string; href: string } };
@@ -13,15 +13,8 @@ const WA_QUESTION = waLink("Hi Petal Steps by Thandiwe Mwaba! I have a question 
 // one product qualifies — a tie (e.g. "a stiletto") returns the tied
 // `candidates` so the bot asks which style rather than guessing stock.
 const FILLER = new Set(["the", "and", "for", "you", "have", "any", "with", "this", "that", "your", "heel", "heels", "shoe", "shoes"]);
-function matchProduct(q: string, products: Product[]): { hit: Product | null; candidates: Product[] } {
+function matchProduct(q: string, products: ClientProduct[]): { hit: ClientProduct | null; candidates: ClientProduct[] } {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ");
-  // Exact SKU match on the raw query — SKUs carry punctuation (18085-33,
-  // 9511-6/C) the word-normalizer would split away.
-  const low = q.toLowerCase();
-  const skuHit = products.find((p) =>
-    new RegExp(`(^|[^a-z0-9])${p.sku.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(low)
-  );
-  if (skuHit) return { hit: skuHit, candidates: [skuHit] };
   const words = norm(q).split(/\s+/).filter((w) => w.length >= 3 && !FILLER.has(w));
   // Score on name + colour words — "apricot" lives in `color`, not `name`.
   const scored = products.map((p) => {
@@ -34,7 +27,7 @@ function matchProduct(q: string, products: Product[]): { hit: Product | null; ca
   return { hit: candidates.length === 1 ? candidates[0] : null, candidates };
 }
 
-function reply(raw: string, products: Product[], pendingSize?: number | null): Omit<Msg, "from"> & { pendingSize?: number | null } {
+function reply(raw: string, products: ClientProduct[], pendingSize?: number | null): Omit<Msg, "from"> & { pendingSize?: number | null } {
   const q = raw.toLowerCase();
   const sizeMatch = /\b(3[5-9]|4[0-5])\b/.exec(q);
   // A size in this message wins; otherwise fall back to the size carried
@@ -50,18 +43,16 @@ function reply(raw: string, products: Product[], pendingSize?: number | null): O
     const names = candidates.slice(0, 4).map((c) => c.name).join(", ");
     return { text: `We have a few like that — which one? ${names}. ${size ? `(Still looking for EU ${size}.)` : "Tell me the name or code and I'll check stock."}`, pendingSize: size };
   }
-  const stockLine = (prod: Product) => {
-    const sizes = Object.entries(prod.stock)
-      .filter(([, c]) => c > 0)
-      .map(([s]) => `EU ${s}`);
+  const stockLine = (prod: ClientProduct) => {
+    const sizes = Object.keys(prod.stock).map((s) => `EU ${s}`);
     return sizes.length
       ? `Yes — ${prod.name} (K${prod.price}) is in stock in ${sizes.join(", ")}.`
       : `${prod.name} is sold out right now — message us on WhatsApp and we'll tell you when it restocks.`;
   };
 
   if (p && size)
-    return (p.stock[size] || 0) > 0
-      ? { text: `${p.name} in EU ${size}: ${p.stock[size] <= 3 ? "only a few left" : "in stock"} (K${p.price}). Tap below to order on WhatsApp.`, link: { label: "Order on WhatsApp", href: WA_ORDER } }
+    return p.stock[size]
+      ? { text: `${p.name} in EU ${size}: ${p.stock[size] === "low" ? "only a few left" : "in stock"} (K${p.price}). Tap below to order on WhatsApp.`, link: { label: "Order on WhatsApp", href: WA_ORDER } }
       : { text: `${p.name} in EU ${size} is sold out. ${p.stock && Object.keys(p.stock).length ? "Other sizes still available — ask me!" : "Message us on WhatsApp for restock news."}`, link: { label: "Ask on WhatsApp", href: WA_QUESTION } };
   if (p && /price|cost|much|pay/.test(q))
     return { text: `${p.name} is K${p.price}. ${stockLine(p)}`, link: { label: "Order on WhatsApp", href: WA_ORDER } };
@@ -96,7 +87,7 @@ function reply(raw: string, products: Product[], pendingSize?: number | null): O
 
 const QUICK = ["How do I order?", "Payment options", "Delivery in Lusaka", "How long do you hold orders?"];
 
-export function ChatWidget({ products }: { products: Product[] }) {
+export function ChatWidget({ products }: { products: ClientProduct[] }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([

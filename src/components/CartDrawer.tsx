@@ -16,7 +16,7 @@ export function CartDrawer() {
   const checkout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!items.length) return toast.error("Your bag is empty — add a pair first 🌸");
-    const lines = items.map((i) => `• ${i.name} (${i.sku}) — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
+    const lines = items.map((i) => `• ${i.name} — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
     const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}${form.heard ? `\nHeard about you via: ${form.heard}` : ""}\n\nPlease confirm availability before I pay. Thank you!`;
     toast.success("Order ready! Opening WhatsApp — our only official number…");
     // Fire-and-forget interest log — never blocks or errors the checkout.
@@ -24,7 +24,7 @@ export function CartDrawer() {
       fetch("/api/log-interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}` }),
+        body: JSON.stringify({ model: i.name, size: i.size, note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}` }),
         keepalive: true,
       }).catch(() => {})
     );

@@ -48,10 +48,15 @@ export async function POST(req: Request) {
   if (!model || model.length > 60) {
     return NextResponse.json({ ok: false, error: "model required" }, { status: 400 });
   }
-  // Only real catalogue SKUs can be logged — otherwise unauthenticated
+  // Only real catalogue styles can be logged — otherwise unauthenticated
   // callers could inject bogus products (or formula strings) into reports.
+  // The storefront no longer knows SKUs (scrubbed payload), so it sends the
+  // style name; resolve either back to the SKU so the sheet stays consistent.
   const { products } = await getProducts(true);
-  if (!products.some((p) => p.sku === model)) {
+  const match =
+    products.find((p) => p.sku === model) ??
+    products.find((p) => p.name.toLowerCase() === model.toLowerCase());
+  if (!match) {
     return NextResponse.json({ ok: false, error: "unknown model" }, { status: 400 });
   }
   const size = Number(body.size);
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
         token,
         action: "logEvent",
         event: "interest",
-        model,
+        model: match.sku,
         size: Number.isInteger(size) && size > 0 ? size : "",
         note,
       }),

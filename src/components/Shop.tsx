@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductCard } from "@/components/ProductCard";
-import { totalPairs, type Filter, type Product } from "@/lib/products";
+import { type ClientProduct, type Filter } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: Filter; label: string }[] = [
@@ -19,16 +19,16 @@ const FILTERS: { value: Filter; label: string }[] = [
 export const EU_SIZES = Array.from({ length: 11 }, (_, i) => 35 + i);
 
 export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick, size, setSize }: {
-  products: Product[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
-  sort: string; setSort: (v: string) => void; onQuick: (p: Product) => void;
+  products: ClientProduct[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
+  sort: string; setSort: (v: string) => void; onQuick: (p: ClientProduct) => void;
   size: number | null; setSize: (s: number | null) => void;
 }) {
   const list = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = products.filter((p) =>
-      (filter === "all" || p.cat === filter || (filter === "low" && totalPairs(p) <= 5)) &&
-      (size === null || (p.stock[size] ?? 0) > 0) &&
-      (`${p.name} ${p.color} ${p.sku}`.toLowerCase().includes(q))
+      (filter === "all" || p.cat === filter || (filter === "low" && p.lowStock)) &&
+      (size === null || !!p.stock[size]) &&
+      (`${p.name} ${p.color}`.toLowerCase().includes(q))
     );
     if (sort === "low") filtered.sort((a, b) => a.price - b.price);
     if (sort === "high") filtered.sort((a, b) => b.price - a.price);

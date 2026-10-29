@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useCart } from "@/context/cart-context";
 import { cn, money } from "@/lib/utils";
-import { availableSizes, type Product } from "@/lib/products";
+import { availableSizes, type ClientProduct } from "@/lib/products";
 
-const CAT_LABEL: Record<Product["cat"], string> = { matte: "Matte", glossy: "Glossy", statement: "Statement", "red-bottom": "Red Bottom" };
+const CAT_LABEL: Record<ClientProduct["cat"], string> = { matte: "Matte", glossy: "Glossy", statement: "Statement", "red-bottom": "Red Bottom" };
 
-export function QuickView({ product, onClose }: { product: Product | null; onClose: () => void }) {
+export function QuickView({ product, onClose }: { product: ClientProduct | null; onClose: () => void }) {
   const { add, setOpen } = useCart();
   const [size, setSize] = useState<number | null>(null);
   useEffect(() => setSize(null), [product]);
@@ -35,7 +35,7 @@ export function QuickView({ product, onClose }: { product: Product | null; onClo
               <div className="flex flex-wrap gap-2">
                 {availableSizes(product).map((s) => (
                   <button key={s} onClick={() => setSize(s)} className={cn("min-w-14 rounded-xl border px-3 py-2 font-semibold", size === s ? "border-rose-500 bg-rose-500 text-white" : "border-rose-200 bg-white hover:border-rose-400")}>
-                    EU {s}<span className="block text-[10px] font-bold opacity-80">{product.stock[s] <= 3 ? "few left" : "in stock"}</span>
+                    EU {s}<span className="block text-[10px] font-bold opacity-80">{product.stock[s] === "low" ? "few left" : "in stock"}</span>
                   </button>
                 ))}
               </div>

@@ -6,7 +6,33 @@ export interface Product {
 }
 
 export const totalPairs = (p: Product) => Object.values(p.stock).reduce((a, b) => a + b, 0);
-export const availableSizes = (p: Product) => Object.keys(p.stock).map(Number).sort((a, b) => a - b);
+export const availableSizes = (p: { stock: Record<number, unknown> }) => Object.keys(p.stock).map(Number).sort((a, b) => a - b);
+
+// What the public storefront is allowed to see: per-size availability flags
+// instead of exact counts, no SKU, and a "running low" badge flag computed
+// server-side. Exact numbers and model codes only reach /admin via ?all=1.
+export type StockFlag = "in" | "low";
+export type ClientProduct = Omit<Product, "sku" | "stock"> & {
+  stock: Record<number, StockFlag>;
+  lowStock: boolean;
+};
+
+export const FEW_PER_SIZE = 3;
+export const FEW_TOTAL = 5;
+
+export function toClientProduct(p: Product): ClientProduct {
+  const stock: Record<number, StockFlag> = {};
+  let total = 0;
+  for (const s of Object.keys(p.stock)) {
+    const c = p.stock[Number(s)];
+    if (c > 0) {
+      stock[Number(s)] = c <= FEW_PER_SIZE ? "low" : "in";
+      total += c;
+    }
+  }
+  const { sku: _sku, stock: _stock, ...rest } = p;
+  return { ...rest, stock, lowStock: total > 0 && total <= FEW_TOTAL };
+}
 
 export const PRODUCTS: Product[] = [
   { id: 1, sku: "18085-33", name: "Abstract Floral Stiletto", color: "Apricot Floral", cat: "statement", price: 600, img: "/products/image12.jpg", desc: "Statement pointed stiletto in a painterly apricot floral print. The pair that starts conversations.", stock: { 35: 1, 37: 1, 38: 1, 39: 1, 40: 2, 42: 1, 43: 1, 44: 1, 45: 1 } },
