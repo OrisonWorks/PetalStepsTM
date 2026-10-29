@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import type { Product } from "@/lib/products";
@@ -1441,14 +1441,13 @@ function LeadsPanel({ products }: { products: Product[] }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
-  const productOf = (model: string) => products.find((p) => p.sku === model);
-  const stocked = (l: Lead) => {
-    const p = productOf(l.model);
+  const productBySku = useMemo(() => new Map(products.map((p) => [p.sku, p])), [products]);
+  const rows = leads.map((l) => {
+    const p = productBySku.get(l.model);
     const s = parseInt(l.size, 10);
-    return p ? (p.stock[s] || 0) > 0 : false;
-  };
-
-  const shown = leads.filter((l) => (show === "all" ? true : show === "stocked" ? stocked(l) : !stocked(l)));
+    return { l, p, inStock: p ? (p.stock[s] || 0) > 0 : false };
+  });
+  const shown = rows.filter((r) => (show === "all" ? true : show === "stocked" ? r.inStock : !r.inStock));
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
@@ -1473,7 +1472,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
             downloadCsv(
               "leads.csv",
               ["model", "size", "taps", "last tap"],
-              shown.map((l) => [l.model, l.size, l.taps, l.lastTs])
+              shown.map((r) => [r.l.model, r.l.size, r.l.taps, r.l.lastTs])
             )
           }
           disabled={!shown.length}
@@ -1503,23 +1502,19 @@ function LeadsPanel({ products }: { products: Product[] }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((l) => {
-              const p = productOf(l.model);
-              const has = stocked(l);
-              return (
-                <tr key={`${l.model}-${l.size}`} className="border-t border-rose-50">
-                  <td className="py-1.5 font-semibold text-stone-700">{p?.name || l.model} <span className="font-normal text-stone-400">{l.model}</span></td>
-                  <td className="py-1.5 text-stone-500">EU {l.size}</td>
-                  <td className="py-1.5 text-right font-semibold text-rose-500">{l.taps}</td>
-                  <td className="py-1.5 text-right text-stone-400">{String(l.lastTs).slice(0, 10)}</td>
-                  <td className="py-1.5 text-right">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${has ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                      {has ? "in stock — follow up" : "sold out — restock"}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+            {shown.map((r) => (
+              <tr key={`${r.l.model}-${r.l.size}`} className="border-t border-rose-50">
+                <td className="py-1.5 font-semibold text-stone-700">{r.p?.name || r.l.model} <span className="font-normal text-stone-400">{r.l.model}</span></td>
+                <td className="py-1.5 text-stone-500">EU {r.l.size}</td>
+                <td className="py-1.5 text-right font-semibold text-rose-500">{r.l.taps}</td>
+                <td className="py-1.5 text-right text-stone-400">{String(r.l.lastTs).slice(0, 10)}</td>
+                <td className="py-1.5 text-right">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${r.inStock ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                    {r.inStock ? "in stock — follow up" : "sold out — restock"}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}
