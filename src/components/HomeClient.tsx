@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
-import { Categories, Contact, Faqs, Footer, Hero, Marquee, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
+import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Marquee, MobileOrderBar, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
 import { Shop } from "@/components/Shop";
 import { totalPairs, type Filter, type Product } from "@/lib/products";
 
@@ -12,6 +12,7 @@ export function HomeClient({ products }: { products: Product[] }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("featured");
   const [quick, setQuick] = useState<Product | null>(null);
+  const [size, setSize] = useState<number | null>(null);
   const pairs = products.reduce((a, p) => a + totalPairs(p), 0);
 
   const goFilter = useCallback((f: Filter) => {
@@ -25,11 +26,11 @@ export function HomeClient({ products }: { products: Product[] }) {
       <main>
         <Hero styles={products.length} pairs={pairs} />
         <Marquee />
+        <Reviews />
         <Categories onSelect={goFilter} />
-        <Shop products={products} filter={filter} setFilter={setFilter} search={search} sort={sort} setSort={setSort} onQuick={setQuick} />
+        <Shop products={products} filter={filter} setFilter={setFilter} search={search} sort={sort} setSort={setSort} onQuick={setQuick} size={size} setSize={setSize} />
         <SaleBanner onSelect={goFilter} />
         <WhyUs />
-        <Reviews />
         <Faqs />
         <Contact />
         <Newsletter />
@@ -37,6 +38,8 @@ export function HomeClient({ products }: { products: Product[] }) {
       <Footer />
       <QuickView product={quick} onClose={() => setQuick(null)} />
       <CartDrawer />
+      <MobileOrderBar />
+      <BackToTop />
     </>
   );
 }

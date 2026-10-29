@@ -11,25 +11,25 @@ import { money, WA_DISPLAY, waLink } from "@/lib/utils";
 
 export function CartDrawer() {
   const { items, open, setOpen, inc, dec, remove, clear, subtotal } = useCart();
-  const [form, setForm] = useState({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka" });
+  const [form, setForm] = useState({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" });
 
   const checkout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!items.length) return toast.error("Your bag is empty — add a pair first 🌸");
     const lines = items.map((i) => `• ${i.name} (${i.sku}) — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
-    const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}\n\nPlease confirm availability before I pay. Thank you!`;
+    const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}${form.heard ? `\nHeard about you via: ${form.heard}` : ""}\n\nPlease confirm availability before I pay. Thank you!`;
     toast.success("Order ready! Opening WhatsApp — our only official number…");
     // Fire-and-forget interest log — never blocks or errors the checkout.
     items.forEach((i) =>
       fetch("/api/log-interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty}` }),
+        body: JSON.stringify({ model: i.sku, size: i.size, note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}` }),
         keepalive: true,
       }).catch(() => {})
     );
     setTimeout(() => window.open(waLink(msg), "_blank"), 900);
-    clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka" }); setOpen(false);
+    clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" }); setOpen(false);
   };
 
   return (
@@ -72,6 +72,16 @@ export function CartDrawer() {
             <option>Out of town — Platinum courier</option>
             <option>Out of town — Falcon courier</option>
             <option>Out of town — Bus courier</option>
+          </select>
+          <select value={form.heard} onChange={(e) => setForm({ ...form, heard: e.target.value })} className="h-11 w-full rounded-full border border-rose-200 bg-white px-4 text-sm outline-none focus:border-rose-400">
+            <option value="">How did you hear about us? (optional)</option>
+            <option>Facebook</option>
+            <option>Instagram</option>
+            <option>TikTok</option>
+            <option>WhatsApp status</option>
+            <option>A friend</option>
+            <option>Walk-in / saw the shop</option>
+            <option>Other</option>
           </select>
           <Button type="submit" className="w-full">Send order on WhatsApp →</Button>
           <div className="rounded-2xl bg-[#fff1e6] p-3 text-xs leading-relaxed text-stone-600">

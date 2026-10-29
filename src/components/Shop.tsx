@@ -16,22 +16,26 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "low", label: "Almost gone" },
 ];
 
-export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick }: {
+export const EU_SIZES = Array.from({ length: 11 }, (_, i) => 35 + i);
+
+export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick, size, setSize }: {
   products: Product[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
   sort: string; setSort: (v: string) => void; onQuick: (p: Product) => void;
+  size: number | null; setSize: (s: number | null) => void;
 }) {
   const totalPairsAll = products.reduce((a, p) => a + totalPairs(p), 0);
   const list = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = products.filter((p) =>
       (filter === "all" || p.cat === filter || (filter === "low" && totalPairs(p) <= 5)) &&
+      (size === null || (p.stock[size] ?? 0) > 0) &&
       (`${p.name} ${p.color} ${p.sku}`.toLowerCase().includes(q))
     );
     if (sort === "low") filtered.sort((a, b) => a.price - b.price);
     if (sort === "high") filtered.sort((a, b) => b.price - a.price);
     if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
     return filtered;
-  }, [products, filter, search, sort]);
+  }, [products, filter, search, sort, size]);
 
   return (
     <section id="shop" className="mx-auto w-[min(1180px,92%)] pb-16">
@@ -46,6 +50,21 @@ export function Shop({ products, filter, setFilter, search, sort, setSort, onQui
             <Button key={f.value} size="sm" variant={filter === f.value ? "default" : "outline"} onClick={() => setFilter(f.value)} className={cn(filter === f.value && "pointer-events-none")}>
               {f.label}
             </Button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-bold uppercase tracking-wider text-stone-400">My size</span>
+          {EU_SIZES.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSize(size === s ? null : s)}
+              className={cn(
+                "min-w-9 rounded-full border px-2 py-1 text-xs font-bold transition",
+                size === s ? "border-rose-500 bg-rose-500 text-white" : "border-rose-200 bg-white text-stone-600 hover:border-rose-400"
+              )}
+            >
+              {s}
+            </button>
           ))}
         </div>
         <Select value={sort} onValueChange={setSort}>

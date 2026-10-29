@@ -13,6 +13,15 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Storefront UX Phase 1 (PR #20)
+
+- "My size" EU 35–45 filter chips in the shop — filters styles to those with stock in that size (AND-combines with category filter).
+- Size strip on every product card: all 11 EU sizes, in-stock highlighted.
+- Sticky mobile order bar (bag count + total → opens checkout) and a back-to-top button.
+- Optional "How did you hear about us?" select in checkout → appended to the WhatsApp order message and the LOG interest note (referral-source analytics data).
+- Reviews section moved above the catalogue for early social proof; shimmer placeholder behind product images.
+- Quick-view modal already existed (photo, size pick, add-to-bag) — unchanged.
+
 ### 2026-10-29 — Brand logo on the site (PR #19)
 
 - `public/brand/logo-mark.png` — transparent-background wordmark cut out of `logo.jpg` (the watercolor mark from the FAQ cards/receipts); `logo.jpg` square kept for badges/favicon.
