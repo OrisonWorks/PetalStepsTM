@@ -7,6 +7,7 @@ import { totalPairs } from "@/lib/products";
 import { amountInWords } from "@/lib/money-words";
 import { waLink } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
 
@@ -115,6 +116,7 @@ function downloadCsv(name: string, headers: string[], rows: (string | number)[][
 }
 
 function SubscribersPanel() {
+  const { ask, dialog } = useConfirm();
   const [subs, setSubs] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -152,6 +154,7 @@ function SubscribersPanel() {
   };
 
   const optOut = async (email: string) => {
+    if (!(await ask({ title: `Opt out ${email}?`, body: "They'll stop receiving newsletters — their email stays on the list marked as opted out.", confirmLabel: "Opt out" }))) return;
     try {
       const res = await fetch("/api/admin/unsubscribe", {
         method: "POST",
@@ -240,6 +243,7 @@ function SubscribersPanel() {
         addresses for a BCC email or broadcast tool. Reply-STOP requests: hit “stop” on their row
         and newsletters skip them.
       </p>
+      {dialog}
     </div>
   );
 }
@@ -345,6 +349,7 @@ function ReportsPanel() {
 }
 
 function ReceiptPanel({ products }: { products: Product[] }) {
+  const { ask, dialog } = useConfirm();
   const { data: aData } = useAnalytics();
   const [form, setForm] = useState({
     client: "",
@@ -385,6 +390,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
     e.preventDefault();
     if (!form.client.trim()) return toast.error("Client name required");
     if (!(amountNum > 0)) return toast.error("Amount must be a positive number");
+    if (!(await ask({ title: `Create receipt for ${form.client.trim()}?`, body: `K${amountNum} — this writes to the sheet${form.email.trim() ? " and emails the client" : ""}.`, confirmLabel: "Create receipt" }))) return;
     setSaving(true);
     try {
       const res = await fetch("/api/admin/receipt", {
@@ -514,12 +520,14 @@ function ReceiptPanel({ products }: { products: Product[] }) {
       <button disabled={saving} className="rounded-lg bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-40 sm:col-span-2">
         {saving ? "Creating…" : "Create receipt"}
       </button>
+      {dialog}
     </form>
   );
 }
 
 
 function AddStylePanel({ onCreated }: { onCreated: () => void }) {
+  const { ask, dialog } = useConfirm();
   const [form, setForm] = useState({
     sku: "",
     name: "",
@@ -540,6 +548,8 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
     const sizes = Object.entries(counts)
       .map(([size, count]) => ({ size: Number(size), count: parseInt(count, 10) || 0 }))
       .filter((s) => s.count > 0);
+    const pairs = sizes.reduce((n, s) => n + s.count, 0);
+    if (!(await ask({ title: `Add "${form.name.trim() || form.sku.trim()}" to the sheet?`, body: `${form.sku.trim()} · K${form.price.trim()} · ${pairs} pair(s) across ${sizes.length} size(s). It goes live on the shop in ~a minute.`, confirmLabel: "Add style" }))) return;
     setSaving(true);
     try {
       const res = await fetch("/api/admin/create-product", {
@@ -600,6 +610,7 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
       <button disabled={saving} className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50 sm:col-span-2">
         {saving ? "Adding…" : "Add style"}
       </button>
+      {dialog}
     </form>
   );
 }
@@ -673,6 +684,7 @@ function csvToItem(row: string[], cols: Map<string, number>): CsvItem {
 const BATCH_SIZE = 200; // matches MAX_ITEMS on /api/admin/create-products
 
 function BulkImport({ onDone }: { onDone: () => void }) {
+  const { ask, dialog } = useConfirm();
   const [items, setItems] = useState<CsvItem[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
@@ -727,6 +739,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       .filter(({ it }) => !it.error && !it.done)
       .map(({ i }) => i);
     if (pendingIdx.length === 0) return;
+    if (!(await ask({ title: `Import ${pendingIdx.length} style${pendingIdx.length === 1 ? "" : "s"} to the sheet?`, body: "Each row is written as a new style. Rows that already exist are rejected — re-imports are safe.", confirmLabel: "Import" }))) return;
     setImporting(true);
     setProgress(0);
     // Track rows by position, not model code (duplicates share a code), and
@@ -863,6 +876,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
           ))}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }
@@ -876,6 +890,7 @@ function EditForm({
   onSaved: (fields: Partial<Product>) => void;
   onCancel: () => void;
 }) {
+  const { ask, dialog } = useConfirm();
   const [form, setForm] = useState({
     name: product.name,
     color: product.color,
@@ -900,6 +915,7 @@ function EditForm({
       toast.error("Price must be a positive number");
       return;
     }
+    if (!(await ask({ title: `Save changes to ${product.name}?`, body: "Updates the live catalogue — shoppers see it within ~a minute.", confirmLabel: "Save" }))) return;
     setSaving(true);
     try {
       const res = await fetch("/api/admin/product", {
@@ -934,6 +950,14 @@ function EditForm({
     } finally {
       setSaving(false);
     }
+  };
+
+  const dirty =
+    form.name !== product.name || form.color !== product.color ||
+    form.price !== String(product.price) || form.cat !== product.cat ||
+    form.img !== product.img || form.desc !== product.desc;
+  const cancel = async () => {
+    if (!dirty || await ask({ title: "Discard your edits?", body: `Your changes to ${product.name} haven't been saved yet.`, confirmLabel: "Discard" })) onCancel();
   };
 
   const input =
@@ -977,12 +1001,13 @@ function EditForm({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={cancel}
           className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-300"
         >
           Cancel
         </button>
       </div>
+      {dialog}
     </form>
   );
 }
@@ -1537,6 +1562,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
 // message + featured styles in the brand frame; the writer sends via MailApp
 // and reports sent/failed/remaining (Gmail caps ~100 recipients/day).
 function NewsletterPanel({ products }: { products: Product[] }) {
+  const { ask, dialog } = useConfirm();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -1588,7 +1614,7 @@ function NewsletterPanel({ products }: { products: Product[] }) {
       toast.error("Subject and message are required");
       return;
     }
-    if (!window.confirm("Send to ALL subscribers now? This can't be undone.")) return;
+    if (!(await ask({ title: "Send to ALL subscribers now?", body: "Every active Petal List subscriber gets this email. It can't be undone.", confirmLabel: "Send newsletter" }))) return;
     setSending(true);
     setResult(null);
     try {
@@ -1666,11 +1692,13 @@ function NewsletterPanel({ products }: { products: Product[] }) {
         <h3 className="text-sm font-semibold text-stone-600">Preview</h3>
         <iframe title="Newsletter preview" sandbox="" srcDoc={html} className="mt-2 h-[480px] w-full rounded-xl border border-stone-100" />
       </div>
+      {dialog}
     </div>
   );
 }
 
 export default function AdminPage() {
+  const { ask, dialog } = useConfirm();
   const [state, setState] = useState<"loading" | "login" | "ready">("loading");
   const [configured, setConfigured] = useState(true);
   const [source, setSource] = useState<string>("");
@@ -1718,11 +1746,20 @@ export default function AdminPage() {
   };
 
   const logout = async () => {
+    if (!(await ask({ title: "Log out of admin?", confirmLabel: "Log out" }))) return;
     await fetch("/api/admin/logout", { method: "POST" });
     setState("login");
   };
 
   const adjust = async (p: Product, size: number, delta: number, undo = false) => {
+    const ok = await ask(
+      undo
+        ? { title: `Undo the last change on ${p.name} EU ${size}?`, confirmLabel: "Undo" }
+        : delta < 0
+          ? { title: `Mark one ${p.name} EU ${size} as sold?`, body: `Stock goes from ${p.stock[size] ?? 0} to ${(p.stock[size] ?? 0) - 1}.`, confirmLabel: "Mark sold" }
+          : { title: `Restock one ${p.name} EU ${size}?`, body: `Stock goes from ${p.stock[size] ?? 0} to ${(p.stock[size] ?? 0) + 1}.`, confirmLabel: "Restock" }
+    );
+    if (!ok) return;
     const key = `${p.sku}-${size}`;
     setBusyKey(key);
     try {
@@ -1956,6 +1993,7 @@ export default function AdminPage() {
           </section>
         ))}
       </div>}
+      {dialog}
     </main>
   );
 }

@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Confirm-before-write dialogs across /admin (PR #34)
+
+- New shared `useConfirm` hook + branded modal (`src/components/ConfirmDialog.tsx`) gates every mutating admin action: sold/restock/undo per size, product Edit save, discard-edits cancel, add style, bulk CSV import, receipt create, newsletter send (replacing `window.confirm`), subscriber opt-out, and logout. Cancel/Esc/backdrop aborts.
+
 ### 2026-10-29 — Demographics: checkout location into interest taps + Areas card (PR #33)
 
 - Checkout `Location` now rides in the interest-log note (`qty N · via X · in Y`) so demand-by-area exists even before a sale. Analytics "Areas" card shows both paid sales (receipts, amber) and interest taps (checkout location, rose). Referral parsing hardened to segment-by-`·`.
