@@ -18,7 +18,9 @@ Living record of what has been built and how the pieces fit together. **Update t
 - **Newsletter** — new `newsletter` admin tab: subject + message, pick up to 4 in-stock styles to feature, branded HTML template (logo, product cards, shop CTA) with live iframe preview. Sends to every SUBSCRIBERS row via writer `sendNewsletter` (MailApp); Gmail's ~100/day quota caps the batch and the UI reports sent/failed/remaining.
 - **Leads** — new `leads` tab: order taps (interest log rows) with no later sale of the same model+size, via `kind=leads`. Table flags "in stock — follow up" vs "sold out — restock", CSV export.
 - **installTriggers()** — run once in the Apps Script editor to create `dailyDigest` (daily ~21:00) + `backupSheet` (Sundays ~06:00); idempotent, replaces existing triggers.
-- New routes: `POST /api/admin/newsletter`, `GET /api/admin/leads` (both admin-gated).
+- New routes: `POST /api/admin/newsletter`, `GET /api/admin/leads`, `POST /api/admin/unsubscribe` (all admin-gated).
+- **Opt-outs** — SUBSCRIBERS gains STATUS/LAST_BATCH columns: "stop" rows are skipped by every send and shown "opted out" in the mailing-list tab (per-row stop button honors reply-STOP; resubscribing clears it). LAST_BATCH stamps a subject+body hash per sent address, so quota-interrupted sends resume where they stopped yet a reused subject still reaches everyone; the preview iframe is sandboxed and photo URLs are attribute-escaped (absolute photo URLs supported).
+- `kind=leads` pairs undo↔original log rows (same pairing as the admin UI) so an undone sale stops hiding the taps it once filled.
 
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
