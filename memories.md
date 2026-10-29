@@ -16,6 +16,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 ### 2026-10-29 — Storefront chat widget (PR #28)
 
 - **ChatWidget** — floating helper bubble (above the mobile order bar; BackToTop shifted up on mobile to clear it). Rule-based replies cover: live stock/size/price lookups (fuzzy product match + EU size extraction), ordering steps, payment numbers, Lusaka Yango collection, couriers, 5-day hold, hours, location, WhatsApp, returns, greetings. Unmatched → WhatsApp deep link. Quick-reply chips seed the conversation. This is the pattern that later plugs into WhatsApp Cloud API.
+- Matcher details: exact SKU detected against the raw query (punctuated SKUs like `18085-33`/`9511-6/C` survive); scoring covers name + colour words ("Apricot" resolves via `color`); tied matches ask "which one?" instead of guessing; a size carries over as `pendingSize` so the clarify→answer turn still answers the original lookup.
 
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
