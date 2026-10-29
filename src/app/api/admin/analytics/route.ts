@@ -21,7 +21,7 @@ export async function GET() {
   };
   try {
     const [log, receipts, subs] = await Promise.all([
-      get("kind=log&n=1000"),
+      get("kind=log&n=5000"),
       get("kind=receipts"),
       get("kind=subscribers"),
     ]);
@@ -31,6 +31,8 @@ export async function GET() {
       receipts: receipts.receipts || [],
       subscribers: subs.subscribers || [],
       receiptsSupported: receipts.ok === true,
+      logSupported: log.ok === true,
+      subsSupported: subs.ok === true,
     });
   } catch {
     return NextResponse.json({ ok: false, error: "Writer unreachable" }, { status: 502 });

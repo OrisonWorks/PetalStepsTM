@@ -27,6 +27,8 @@ type AnalyticsData = {
   receipts: ReceiptRow[];
   subscribers: Subscriber[];
   receiptsSupported: boolean;
+  logSupported: boolean;
+  subsSupported: boolean;
 };
 
 // One shared fetch of log + receipts + subscribers for every admin panel.
@@ -44,6 +46,8 @@ function useAnalytics() {
           receipts: json.receipts || [],
           subscribers: json.subscribers || [],
           receiptsSupported: json.receiptsSupported === true,
+          logSupported: json.logSupported !== false,
+          subsSupported: json.subsSupported !== false,
         });
       } else {
         setData(null);
@@ -60,7 +64,10 @@ const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 
 function downloadCsv(name: string, headers: string[], rows: (string | number)[][]) {
   const esc = (v: string | number) => {
-    const s = String(v);
+    let s = String(v);
+    // Leading =, +, -, @ executes as a formula when the CSV is opened in
+    // a spreadsheet — prefix with ' so the export stays inert.
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
@@ -930,8 +937,12 @@ function DashboardPanel({ products, analytics, go }: {
     .filter((r) => dayOf(r.date || "") === today)
     .reduce((a, r) => a + (parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0), 0);
   const lowStock = products.filter((p) => totalPairs(p) > 0 && totalPairs(p) <= 5);
+  // Dead stock only makes sense when the log read actually succeeded —
+  // a failed read would mark every stocked style as dead.
   const soldModels = new Set(log.filter((r) => r.action === "sold").map((r) => r.model));
-  const deadStock = products.filter((p) => totalPairs(p) > 0 && !soldModels.has(p.sku));
+  const deadStock = data && data.logSupported !== false
+    ? products.filter((p) => totalPairs(p) > 0 && !soldModels.has(p.sku))
+    : [];
 
   return (
     <div className="space-y-4">
@@ -944,6 +955,11 @@ function DashboardPanel({ products, analytics, go }: {
       {data && !data.receiptsSupported && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           Receipt analytics need the latest stock_writer.gs redeployed (kind=receipts). Sales and subscriber data still work.
+        </p>
+      )}
+      {data && (data.logSupported === false || data.subsSupported === false) && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Some sheet reads failed — figures below may be incomplete. Try Refresh data.
         </p>
       )}
       <div className="grid gap-3 lg:grid-cols-2">
@@ -1068,16 +1084,22 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   });
   const maxPay = Math.max(1, ...payMix.values());
 
-  const byPhone = new Map<string, { name: string; count: number; total: number }>();
-  receipts.forEach((r) => {
+  // Repeat customers count across ALL receipts (a repeat buyer's first
+  // purchase may predate the selected range); only those with a purchase
+  // inside the range are listed, so out-of-range-only buyers don't appear.
+  const byPhone = new Map<string, { name: string; count: number; inRange: boolean; total: number }>();
+  data.receipts.forEach((r) => {
     const ph = String(r.phone || "").replace(/[^0-9+]/g, "");
     if (!ph) return;
-    const e = byPhone.get(ph) || { name: String(r.client || ""), count: 0, total: 0 };
+    const e = byPhone.get(ph) || { name: String(r.client || ""), count: 0, inRange: false, total: 0 };
     e.count += 1;
-    e.total += parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0;
+    if (dayOf(r.date || "") >= from) {
+      e.inRange = true;
+      e.total += parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0;
+    }
     byPhone.set(ph, e);
   });
-  const repeaters = Array.from(byPhone.entries()).filter(([, v]) => v.count > 1).sort((a, b) => b[1].total - a[1].total);
+  const repeaters = Array.from(byPhone.entries()).filter(([, v]) => v.count > 1 && v.inRange).sort((a, b) => b[1].total - a[1].total);
 
   const heardMix = new Map<string, number>();
   log.forEach((r) => {
@@ -1115,6 +1137,11 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
       {!data.receiptsSupported && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           Receipt revenue/mix/areas need the latest stock_writer.gs redeployed (kind=receipts). Log + subscriber analytics work now.
+        </p>
+      )}
+      {(data.logSupported === false || data.subsSupported === false) && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Some sheet reads failed — figures below may be incomplete. Try Refresh.
         </p>
       )}
       <div className="rounded-2xl border border-rose-100 bg-white p-4">
@@ -1278,14 +1305,14 @@ export default function AdminPage() {
     setState("login");
   };
 
-  const adjust = async (p: Product, size: number, delta: number) => {
+  const adjust = async (p: Product, size: number, delta: number, undo = false) => {
     const key = `${p.sku}-${size}`;
     setBusyKey(key);
     try {
       const res = await fetch("/api/admin/sold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: p.sku, size, delta }),
+        body: JSON.stringify({ sku: p.sku, size, delta, undo }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) {
@@ -1305,7 +1332,7 @@ export default function AdminPage() {
         )
       );
       toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`, {
-        action: { label: "Undo", onClick: () => adjust(p, size, -delta) },
+        action: { label: "Undo", onClick: () => adjust(p, size, -delta, true) },
       });
     } catch {
       toast.error("Update failed");

@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Review fixes for PR #21 (PR #23)
+
+- `kind=log` cap raised 1000→5000 (older sales kept); undo writes log as `undo` (excluded from sold/restock counts) instead of a fake sale/restock — the `undo:true` flag flows client → `/api/admin/sold` → writer.
+- `/api/admin/analytics` returns `logSupported`/`subsSupported`/`receiptsSupported` flags; panels warn on failed reads instead of showing fake zeroes, and dead-stock hides when the log read failed.
+- Repeat customers count across ALL receipts; only those with a purchase inside the range are listed (total shown = in-range spend).
+- `downloadCsv` prefixes leading `=+-@` with `'` — exported names/fields can't execute as spreadsheet formulas.
+
 ### 2026-10-29 — Admin dashboard + analytics (PR #21)
 
 - **Dashboard** (new default admin view): KPI cards — pairs in stock, sold today, order taps today, revenue today; low-stock alerts (≤5 pairs) and dead-stock list (never sold in the log); quick links.

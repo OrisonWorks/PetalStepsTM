@@ -117,7 +117,7 @@ function doPost(e) {
           newRow[countCol] = applySet;
           newRow[modelCol] = model;
           sheet.appendRow(newRow);
-          appendLog_("restock", model, size, "0→" + applySet);
+          appendLog_(body.undo ? "undo" : "restock", model, size, "0→" + applySet);
           return out({
             ok: true,
             model,
@@ -152,7 +152,7 @@ function doPost(e) {
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
-      appendLog_(next < current ? "sold" : "restock", model, size,
+      appendLog_(body.undo ? "undo" : next < current ? "sold" : "restock", model, size,
         current + "→" + next);
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
@@ -542,7 +542,7 @@ function doGet(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const kind = String(p.kind || "");
     if (kind === "log") {
-      const n = Math.min(1000, parseInt(p.n || "300", 10) || 300);
+      const n = Math.min(5000, parseInt(p.n || "300", 10) || 300);
       const day = String(p.day || "");
       // Filter by day BEFORE the row cap so older days don't fall off the
       // tail of the log.
