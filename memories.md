@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Review fixes for PR #23 (PR #24)
+
+- `countAction()` nets `undo` rows off the action they reversed (direction parsed from the `a→b` stock note: next>prev reversed a sale). Reports, dashboard KPIs, trend/top-model/size-demand charts all count net — an undone sale no longer counts as sold.
+- KPI cards show `—` and the dead-stock card says "couldn't check" when the log read fails, instead of claiming zero sales.
+- CSV export escape now also catches whitespace before `=+-@` (`" =cmd"` no longer executes as a formula).
+
 ### 2026-10-29 — Review fixes for PR #21 (PR #23)
 
 - `kind=log` cap raised 1000→5000 (older sales kept); undo writes log as `undo` (excluded from sold/restock counts) instead of a fake sale/restock — the `undo:true` flag flows client → `/api/admin/sold` → writer.

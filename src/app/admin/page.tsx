@@ -62,12 +62,23 @@ function useAnalytics() {
 
 const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 
+// Maps a log row to the counter it affects. `undo` rows carry the same
+// "a→b" stock note as the write they reversed, so the direction says which
+// bucket to decrement: next>prev reversed a sale, next<prev a restock.
+const countAction = (r: LogRow): { kind: string; sign: number } => {
+  if (r.action !== "undo") return { kind: r.action, sign: 1 };
+  const m = String(r.note || "").split("→").map((x) => parseInt(x, 10));
+  return m.length === 2 && m.every((x) => !isNaN(x))
+    ? { kind: m[1] > m[0] ? "sold" : "restock", sign: -1 }
+    : { kind: "undo", sign: 1 };
+};
+
 function downloadCsv(name: string, headers: string[], rows: (string | number)[][]) {
   const esc = (v: string | number) => {
     let s = String(v);
     // Leading =, +, -, @ executes as a formula when the CSV is opened in
     // a spreadsheet — prefix with ' so the export stays inert.
-    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    if (/^\s*[=+\-@]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
@@ -197,13 +208,18 @@ function ReportsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sold = rows.filter((r) => r.action === "sold");
-  const interest = rows.filter((r) => r.action === "interest");
-  const restock = rows.filter((r) => r.action === "restock");
+  // Net counts: `undo` rows decrement the action they reversed.
+  const net = { sold: 0, interest: 0, restock: 0 };
   const byModel = new Map<string, number>();
-  sold.forEach((r) => byModel.set(r.model, (byModel.get(r.model) || 0) + 1));
   const interestByModel = new Map<string, number>();
-  interest.forEach((r) => interestByModel.set(r.model, (interestByModel.get(r.model) || 0) + 1));
+  rows.forEach((r) => {
+    const { kind, sign } = countAction(r);
+    if (kind === "sold" || kind === "restock" || kind === "interest") {
+      net[kind as keyof typeof net] += sign;
+      if (kind === "sold") byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
+      if (kind === "interest") interestByModel.set(r.model, (interestByModel.get(r.model) || 0) + 1);
+    }
+  });
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
@@ -227,15 +243,15 @@ function ReportsPanel() {
         <>
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             <div className="rounded-xl bg-rose-50 p-3">
-              <strong className="block text-2xl text-rose-600">{sold.length}</strong>
+              <strong className="block text-2xl text-rose-600">{net.sold}</strong>
               <span className="text-xs text-stone-500">pairs sold</span>
             </div>
             <div className="rounded-xl bg-stone-50 p-3">
-              <strong className="block text-2xl text-stone-700">{interest.length}</strong>
+              <strong className="block text-2xl text-stone-700">{net.interest}</strong>
               <span className="text-xs text-stone-500">order taps</span>
             </div>
             <div className="rounded-xl bg-stone-50 p-3">
-              <strong className="block text-2xl text-stone-700">{restock.length}</strong>
+              <strong className="block text-2xl text-stone-700">{net.restock}</strong>
               <span className="text-xs text-stone-500">restocks</span>
             </div>
           </div>
@@ -255,7 +271,7 @@ function ReportsPanel() {
                   <td className="py-2 text-right text-stone-500">{interestByModel.get(m) || 0}</td>
                 </tr>
               ))}
-              {sold.length === 0 && interest.length === 0 && (
+              {net.sold === 0 && net.interest === 0 && (
                 <tr><td colSpan={3} className="py-6 text-center text-stone-400">No activity this day</td></tr>
               )}
             </tbody>
@@ -930,8 +946,14 @@ function DashboardPanel({ products, analytics, go }: {
   const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
   const log = data?.log || [];
   const receipts = data?.receipts || [];
-  const soldToday = log.filter((r) => r.action === "sold" && dayOf(r.ts) === today).length;
-  const soldWeek = log.filter((r) => r.action === "sold" && dayOf(r.ts) >= weekAgo).length;
+  const logOk = data ? data.logSupported !== false : true;
+  const netSold = (minDay: string) =>
+    log.reduce((a, r) => {
+      const c = countAction(r);
+      return c.kind === "sold" && dayOf(r.ts) >= minDay ? a + c.sign : a;
+    }, 0);
+  const soldToday = netSold(today);
+  const soldWeek = netSold(weekAgo);
   const tapsToday = log.filter((r) => r.action === "interest" && dayOf(r.ts) === today).length;
   const revToday = receipts
     .filter((r) => dayOf(r.date || "") === today)
@@ -948,8 +970,8 @@ function DashboardPanel({ products, analytics, go }: {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Pairs in stock" value={products.reduce((a, p) => a + totalPairs(p), 0)} hint={`${products.length} styles`} />
-        <Kpi label="Pairs sold today" value={soldToday} hint={`${soldWeek} in last 7 days`} />
-        <Kpi label="Order taps today" value={tapsToday} hint="WhatsApp orders opened" />
+        <Kpi label="Pairs sold today" value={logOk ? soldToday : "—"} hint={logOk ? `${soldWeek} in last 7 days` : "log read failed"} />
+        <Kpi label="Order taps today" value={logOk ? tapsToday : "—"} hint={logOk ? "WhatsApp orders opened" : "log read failed"} />
         <Kpi label="Revenue today" value={`K${revToday}`} hint={data && !data.receiptsSupported ? "redeploy writer for receipts" : undefined} />
       </div>
       {data && !data.receiptsSupported && (
@@ -988,6 +1010,8 @@ function DashboardPanel({ products, analytics, go }: {
           </div>
           {loading ? (
             <p className="mt-3 text-sm text-stone-400">Loading…</p>
+          ) : !logOk ? (
+            <p className="mt-3 text-sm text-stone-400">Couldn't check — the log read failed. Hit Refresh data.</p>
           ) : deadStock.length === 0 ? (
             <p className="mt-3 text-sm text-stone-400">Every stocked style has sold at least once in the log.</p>
           ) : (
@@ -1046,10 +1070,11 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
 
   const perDay = new Map<string, { sold: number; taps: number }>();
   log.forEach((r) => {
+    const { kind, sign } = countAction(r);
     const d = dayOf(r.ts);
     const e = perDay.get(d) || { sold: 0, taps: 0 };
-    if (r.action === "sold") e.sold += 1;
-    if (r.action === "interest") e.taps += 1;
+    if (kind === "sold") e.sold += sign;
+    if (kind === "interest") e.taps += 1;
     perDay.set(d, e);
   });
   const days = Array.from({ length: range }, (_, i) => {
@@ -1061,8 +1086,9 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   const soldByModel = new Map<string, number>();
   const tapsByModel = new Map<string, number>();
   log.forEach((r) => {
-    if (r.action === "sold") soldByModel.set(r.model, (soldByModel.get(r.model) || 0) + 1);
-    if (r.action === "interest") tapsByModel.set(r.model, (tapsByModel.get(r.model) || 0) + 1);
+    const { kind, sign } = countAction(r);
+    if (kind === "sold") soldByModel.set(r.model, (soldByModel.get(r.model) || 0) + sign);
+    if (kind === "interest") tapsByModel.set(r.model, (tapsByModel.get(r.model) || 0) + 1);
   });
   const topModels = Array.from(new Set([...soldByModel.keys(), ...tapsByModel.keys()]))
     .map((m) => ({ m, sold: soldByModel.get(m) || 0, taps: tapsByModel.get(m) || 0 }))
@@ -1071,9 +1097,10 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
 
   const sizeDemand = new Map<number, number>();
   log.forEach((r) => {
-    if (r.action !== "sold" && r.action !== "interest") return;
+    const { kind, sign } = countAction(r);
     const s = parseInt(r.size, 10);
-    if (s >= 35 && s <= 45) sizeDemand.set(s, (sizeDemand.get(s) || 0) + 1);
+    if (!(s >= 35 && s <= 45)) return;
+    if (kind === "sold" || kind === "interest") sizeDemand.set(s, (sizeDemand.get(s) || 0) + sign);
   });
   const maxSize = Math.max(1, ...sizeDemand.values());
 
