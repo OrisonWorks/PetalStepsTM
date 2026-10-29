@@ -31,8 +31,8 @@
  *     Gmail quota runs out; returns {sent, failed, remaining}. Rows whose
  *     STATUS column is marked (e.g. "stop") are skipped; a LAST_BATCH
  *     marker stops a quota-interrupted rerun resending the same message
- *     (the batch key hashes subject + body, so a later same-subject
- *     campaign still reaches everyone).
+ *     (the batch key hashes the full subject + text + html, so a later
+ *     same-subject campaign still reaches everyone).
  * POST JSON body: { token, action: "unsubscribe", email }
  *   - Marks the SUBSCRIBERS row STATUS=stop so future sends skip it.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
@@ -620,9 +620,10 @@ function sendReceiptEmail(body, out) {
 // MailApp.getRemainingDailyQuota() gates the loop so a big list degrades
 // to a partial send the caller can rerun tomorrow, not an error. Rows
 // with a STATUS value (e.g. "stop") are skipped; each send stamps
-// LAST_BATCH with a key hashed from subject+body, so a quota-interrupted
-// rerun continues where it stopped — while a NEW campaign reusing the
-// subject (different message) has a different key and sends to all.
+// LAST_BATCH with a key hashed from the full subject+text+html, so a
+// quota-interrupted rerun continues where it stopped — while any NEW
+// content (same subject, different message or photo) has a different
+// key and sends to all.
 function sendNewsletter(body, out) {
   const subject = safe_(String(body.subject || "").trim()).slice(0, 200);
   const html = String(body.html || "").slice(0, 60000);
@@ -648,10 +649,11 @@ function sendNewsletter(body, out) {
     const emailCol = header.indexOf("email");
     const statusCol = colOf("status");
     const batchCol = colOf("last_batch");
-    // Campaign identity = hash of subject + body, not the subject alone:
-    // rerunning the same send resumes it, but a different newsletter with
-    // the same subject gets a different key and reaches everyone.
-    const batchKey = hash_(subject + "|" + (text || html.slice(0, 500)));
+    // Campaign identity = hash of the FULL delivered content (subject +
+    // text + html), not the subject alone: rerunning the same send
+    // resumes it, while any content change — a different message, a new
+    // featured photo — gets a different key and reaches everyone.
+    const batchKey = hash_(subject + "|" + text + "|" + html);
     const data = sheet.getDataRange().getValues();
     let eligible = 0;
     let sent = 0;
