@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Flower2, Menu, Search, ShoppingBag, X } from "lucide-react";
+import Image from "next/image";
+import { Menu, Search, ShoppingBag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/cart-context";
@@ -18,7 +19,7 @@ export function Header({ search, setSearch }: { search: string; setSearch: (v: s
       </div>
       <nav className="mx-auto flex w-[min(1180px,92%)] items-center gap-4 py-3">
         <a href="#top" className="flex items-center gap-2">
-          <Flower2 className="h-6 w-6 text-rose-500" /><span className="font-script text-3xl leading-none">Petal Steps</span><span className="hidden text-[10px] font-bold uppercase tracking-[0.25em] text-stone-500 sm:block">By Thandiwe<br />Mwaba</span>
+          <Image src="/brand/logo-mark.png" alt="Petal Steps by Thandiwe Mwaba" width={1013} height={552} priority className="h-11 w-auto" />
         </a>
         <button className="ml-auto md:hidden" onClick={() => setMenu(!menu)} aria-label="Menu">{menu ? <X /> : <Menu />}</button>
         <ul className={`gap-6 text-sm font-semibold md:ml-auto md:flex ${menu ? "absolute inset-x-0 top-full flex flex-col bg-white p-4 shadow-lg" : "hidden"}`}>

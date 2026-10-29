@@ -1,5 +1,6 @@
 "use client";
 import { use, useEffect, useState } from "react";
+import Image from "next/image";
 
 type Receipt = {
   no: string;
@@ -55,8 +56,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ no: string }
         {/* brand header */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-stone-800 pb-4">
           <div>
-            <p className="font-script text-5xl leading-none text-stone-900">Petal Steps</p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.35em] text-stone-500">By Thandiwe Mwaba</p>
+            <Image src="/brand/logo-mark.png" alt="Petal Steps by Thandiwe Mwaba" width={1013} height={552} className="h-16 w-auto" />
           </div>
           <div className="text-right text-xs leading-relaxed text-stone-600">
             <p>Location: Block A Shop B, Thompson Park,<br />Munali Rd 4774, Lusaka- Zambia</p>

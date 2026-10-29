@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Brand logo on the site (PR #19)
+
+- `public/brand/logo-mark.png` — transparent-background wordmark cut out of `logo.jpg` (the watercolor mark from the FAQ cards/receipts); `logo.jpg` square kept for badges/favicon.
+- Header brand lockup (Flower2 + text) replaced by the logo mark; same mark used in the hero, admin login, and receipt header.
+- Footer and admin header get the square logo as a rounded badge (black script wouldn't read on dark backgrounds).
+
 ### 2026-10-29 — FAQs, mailing list, error states (PRs #15–#17)
 
 - FAQs section (`#faqs`, linked from footer) with transcribed policy answers: ordering, payment numbers, Yango bookings, couriers, 5-day hold.
