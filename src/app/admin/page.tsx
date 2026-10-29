@@ -1112,7 +1112,7 @@ function Bar({ label, value, max, color = "bg-rose-400" }: { label: string; valu
   );
 }
 
-function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof useAnalytics>; products: Product[] }) {
+function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnType<typeof useAnalytics>; products: Product[]; stockLive: boolean }) {
   const { data, loading, reload } = analytics;
   const [range, setRange] = useState(14);
   if (loading || !data) {
@@ -1153,7 +1153,9 @@ function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof 
   const maxRev = Math.max(1, ...days.map((x) => x.rev));
   const totalRev = days.reduce((a, x) => a + x.rev, 0);
 
-  // Funnel: order taps → logged sales → paid receipts (conversion rates).
+  // Funnel: order taps → logged sales. Receipts sit beside it as an
+  // independent count — they aren't linked to stock sales (one receipt can
+  // cover several pairs, or none), so they don't form a conversion stage.
   const tapsTotal = net.reduce((a, { kind }) => a + (kind === "interest" ? 1 : 0), 0);
   const soldTotal = net.reduce((a, { kind, sign }) => a + (kind === "sold" ? sign : 0), 0);
   const paidTotal = receipts.length;
@@ -1170,10 +1172,13 @@ function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof 
     .slice(0, 12);
 
   // Sell-through per style: sold in range ÷ (sold + stock on hand now).
+  // Only meaningful against LIVE sheet stock — the fallback catalogue has no
+  // stock for sheet-created styles and would fake 100% sell-outs. SKUs missing
+  // from the map are skipped rather than treated as zero stock.
   const stockBySku = new Map(products.map((p) => [p.sku, totalPairs(p)]));
-  const sellThrough = Array.from(soldByModel.entries())
-    .map(([m, sold]) => ({ m, sold, pct: Math.round((sold / Math.max(1, sold + (stockBySku.get(m) || 0))) * 100) }))
-    .filter((x) => x.sold > 0)
+  const sellThrough = !stockLive ? [] : Array.from(soldByModel.entries())
+    .filter(([m, sold]) => sold > 0 && stockBySku.has(m))
+    .map(([m, sold]) => ({ m, sold, pct: Math.round((sold / Math.max(1, sold + stockBySku.get(m)!)) * 100) }))
     .sort((a, b) => b.pct - a.pct || b.sold - a.sold)
     .slice(0, 12);
   const maxSell = Math.max(1, ...sellThrough.map((x) => x.pct));
@@ -1275,12 +1280,11 @@ function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof 
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
-          <h3 className="font-semibold text-stone-800">Demand funnel — taps → sales → paid</h3>
+          <h3 className="font-semibold text-stone-800">Demand funnel — taps → sales</h3>
           <div className="mt-3 space-y-2">
             {[
               { label: "Order taps", n: tapsTotal, pct: 100 },
               { label: "Sales logged", n: soldTotal, pct: tapsTotal ? Math.round((soldTotal / tapsTotal) * 100) : 0 },
-              { label: "Paid receipts", n: paidTotal, pct: soldTotal ? Math.round((paidTotal / soldTotal) * 100) : 0 },
             ].map((s) => (
               <div key={s.label} className="flex items-center gap-3 text-sm">
                 <span className="w-28 shrink-0 text-stone-500">{s.label}</span>
@@ -1290,8 +1294,15 @@ function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof 
                 <span className="w-16 shrink-0 text-right font-semibold text-stone-700">{s.n} <span className="font-normal text-stone-400">{s.pct}%</span></span>
               </div>
             ))}
+            <div className="flex items-center gap-3 text-sm">
+              <span className="w-28 shrink-0 text-stone-500">Receipts written</span>
+              <div className="h-5 flex-1 rounded bg-stone-100">
+                <div className="h-5 rounded bg-emerald-400" style={{ width: `${Math.min(100, (paidTotal / Math.max(1, tapsTotal)) * 100)}%` }} />
+              </div>
+              <span className="w-16 shrink-0 text-right font-semibold text-stone-700">{paidTotal} <span className="font-normal text-stone-400">K{totalRev.toLocaleString()}</span></span>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-stone-400">Each stage as % of the one before — the gap between taps and sales is unserved demand (see leads).</p>
+          <p className="mt-2 text-xs text-stone-400">Sales as % of taps. Receipts are written independently of stock sales (one receipt can cover several pairs), so they're counted separately — see leads for open demand.</p>
         </div>
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
           <h3 className="font-semibold text-stone-800">Sell-through — % of stock sold</h3>
@@ -1299,7 +1310,7 @@ function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof 
             {sellThrough.map((x) => (
               <Bar key={x.m} label={x.m} value={x.pct} max={maxSell} color="bg-emerald-400" />
             ))}
-            {!sellThrough.length && <p className="text-sm text-stone-400">No sales in range</p>}
+            {!sellThrough.length && <p className="text-sm text-stone-400">{stockLive ? "No sales in range" : "Needs live stock — catalogue is on fallback"}</p>}
           </div>
           <p className="mt-2 text-xs text-stone-400">sold ÷ (sold + stock on hand) in range — high % styles are selling out.</p>
         </div>
@@ -1792,7 +1803,7 @@ export default function AdminPage() {
         <div className="mt-6"><DashboardPanel products={products} analytics={analytics} go={setView} /></div>
       )}
       {view === "analytics" && (
-        <div className="mt-6"><AnalyticsPanel analytics={analytics} products={products} /></div>
+        <div className="mt-6"><AnalyticsPanel analytics={analytics} products={products} stockLive={source === "sheet"} /></div>
       )}
       {view === "add" && (
         <div className="mt-6">

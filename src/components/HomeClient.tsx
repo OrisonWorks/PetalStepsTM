@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import { CartDrawer } from "@/components/CartDrawer";
+import { ChatWidget } from "@/components/ChatWidget";
 import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
 import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Marquee, MobileOrderBar, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
@@ -40,6 +41,7 @@ export function HomeClient({ products }: { products: Product[] }) {
       <CartDrawer />
       <MobileOrderBar />
       <BackToTop />
+      <ChatWidget products={products} />
     </>
   );
 }

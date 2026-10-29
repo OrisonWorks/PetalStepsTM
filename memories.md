@@ -16,8 +16,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 ### 2026-10-29 — Analytics: revenue trend, funnel, sell-through (PR #29)
 
 - **Revenue trend** — daily receipt totals now draw a third (emerald, own-scale) bar in the sales-trend card with a K-total in the header and a "revenue K" column in the CSV export.
-- **Demand funnel** — order taps → sales logged → paid receipts with stage-to-stage conversion %; the taps→sales gap is unserved demand (leads tab).
-- **Sell-through** — per-style sold ÷ (sold + stock on hand) %, top 12; needs the `products` prop (now passed into AnalyticsPanel). High % = selling out.
+- **Demand funnel** — order taps → sales logged with conversion %; receipts sit beside it as an independent count + K total (they aren't linked to stock sales — one receipt can cover several pairs), so they are NOT a conversion stage. Taps−sold is not labeled unserved demand — true open demand lives in the leads tab.
+- **Sell-through** — per-style sold ÷ (sold + stock on hand) %, top 12; only computed against LIVE sheet stock (`stockLive` prop — hidden when the catalogue is on fallback, which lacks sheet-only styles and would fake 100% sell-outs), and SKUs absent from the stock map are skipped rather than read as zero.
+
+### 2026-10-29 — Storefront chat widget (PR #28)
+
+- **ChatWidget** — floating helper bubble (above the mobile order bar; BackToTop shifted up on mobile to clear it). Rule-based replies cover: live stock/size/price lookups (fuzzy product match + EU size extraction), ordering steps, payment numbers, Lusaka Yango collection, couriers, 5-day hold, hours, location, WhatsApp, returns, greetings. Unmatched → WhatsApp deep link. Quick-reply chips seed the conversation. This is the pattern that later plugs into WhatsApp Cloud API.
+- Matcher details: exact SKU detected against the raw query (punctuated SKUs like `18085-33`/`9511-6/C` survive); scoring covers name + colour words ("Apricot" resolves via `color`); tied matches ask "which one?" instead of guessing; a size carries over as `pendingSize` so the clarify→answer turn still answers the original lookup.
 
 ### 2026-10-29 — Newsletter, leads, one-click triggers (PR #27)
 
@@ -27,6 +32,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - New routes: `POST /api/admin/newsletter`, `GET /api/admin/leads`, `POST /api/admin/unsubscribe` (all admin-gated).
 - **Opt-outs** — SUBSCRIBERS gains STATUS/LAST_BATCH columns: "stop" rows are skipped by every send and shown "opted out" in the mailing-list tab (per-row stop button honors reply-STOP; resubscribing clears it). LAST_BATCH stamps a hash of the full subject+text+html per sent address, so quota-interrupted sends resume where they stopped yet a reused subject still reaches everyone; the preview iframe is sandboxed and photo URLs are attribute-escaped (absolute photo URLs supported).
 - `kind=leads` pairs undo↔original log rows (same pairing as the admin UI) so an undone sale stops hiding the taps it once filled.
+
 
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
