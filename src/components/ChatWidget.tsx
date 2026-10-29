@@ -9,32 +9,43 @@ type Msg = { from: "bot" | "user"; text: string; link?: { label: string; href: s
 const WA_ORDER = waLink("Hi Petal Steps by Thandiwe Mwaba! I'd like to place an order.");
 const WA_QUESTION = waLink("Hi Petal Steps by Thandiwe Mwaba! I have a question about your heels.");
 
-// Finds the product the message is about: exact sku match first, then the
-// name sharing the most meaningful words (≥3 chars, minus filler).
+// Finds the product the message is about. `hit` is set only when exactly
+// one product qualifies — a tie (e.g. "a stiletto") returns the tied
+// `candidates` so the bot asks which style rather than guessing stock.
 const FILLER = new Set(["the", "and", "for", "you", "have", "any", "with", "this", "that", "your", "heel", "heels", "shoe", "shoes"]);
-function matchProduct(q: string, products: Product[]): Product | null {
+function matchProduct(q: string, products: Product[]): { hit: Product | null; candidates: Product[] } {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ");
+  // Exact SKU match on the raw query — SKUs carry punctuation (18085-33,
+  // 9511-6/C) the word-normalizer would split away.
+  const low = q.toLowerCase();
+  const skuHit = products.find((p) =>
+    new RegExp(`(^|[^a-z0-9])${p.sku.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(low)
+  );
+  if (skuHit) return { hit: skuHit, candidates: [skuHit] };
   const words = norm(q).split(/\s+/).filter((w) => w.length >= 3 && !FILLER.has(w));
-  const skuHit = products.find((p) => words.includes(p.sku.toLowerCase()));
-  if (skuHit) return skuHit;
-  let best: Product | null = null;
-  let bestScore = 0;
-  for (const p of products) {
-    const nameWords = norm(p.name).split(/\s+/).filter((w) => w.length >= 3 && !FILLER.has(w));
+  // Score on name + colour words — "apricot" lives in `color`, not `name`.
+  const scored = products.map((p) => {
+    const nameWords = norm(p.name + " " + p.color).split(/\s+/).filter((w) => w.length >= 3 && !FILLER.has(w));
     const score = nameWords.filter((w) => words.some((q) => q.startsWith(w) || w.startsWith(q))).length;
-    if (score > bestScore) {
-      best = p;
-      bestScore = score;
-    }
-  }
-  return bestScore > 0 ? best : null;
+    return { p, score };
+  });
+  const bestScore = Math.max(0, ...scored.map((s) => s.score));
+  const candidates = bestScore > 0 ? scored.filter((s) => s.score === bestScore).map((s) => s.p) : [];
+  return { hit: candidates.length === 1 ? candidates[0] : null, candidates };
 }
 
 function reply(raw: string, products: Product[]): Omit<Msg, "from"> {
   const q = raw.toLowerCase();
   const sizeMatch = /\b(3[5-9]|4[0-5])\b/.exec(q);
   const size = sizeMatch ? parseInt(sizeMatch[1], 10) : null;
-  const p = matchProduct(q, products);
+  const { hit: p, candidates } = matchProduct(q, products);
+
+  // Several styles tie on the words given ("a stiletto", "something red") —
+  // ask which one instead of quoting an arbitrary style's stock.
+  if (!p && candidates.length > 1) {
+    const names = candidates.slice(0, 4).map((c) => c.name).join(", ");
+    return { text: `We have a few like that — which one? ${names}. ${size ? `(Still looking for EU ${size}.)` : "Tell me the name or code and I'll check stock."}` };
+  }
   const stockLine = (prod: Product) => {
     const sizes = Object.entries(prod.stock)
       .filter(([, c]) => c > 0)
