@@ -15,7 +15,8 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ### 2026-10-29 — Confirm-before-write dialogs across /admin (PR #34)
 
-- New shared `useConfirm` hook + branded modal (`src/components/ConfirmDialog.tsx`) gates every mutating admin action: sold/restock/undo per size, product Edit save, discard-edits cancel, add style, bulk CSV import, receipt create, newsletter send (replacing `window.confirm`), subscriber opt-out, and logout. Cancel/Esc/backdrop aborts.
+- New shared `useConfirm` hook + branded modal (`src/components/ConfirmDialog.tsx`) gates every mutating admin action: sold/restock/undo per size, product Edit save, add style, bulk CSV import, receipt create, newsletter send (replacing `window.confirm`), subscriber opt-out, and logout. Cancel/Esc/backdrop aborts.
+- Unsaved edit guard lives on `AdminPage`: `EditForm` reports dirtiness via `onDirty`; all unmount paths (Cancel, row Close, Edit-other, tab switch via `goView`) funnel through `closeEditor` which confirms once before discarding.
 
 ### 2026-10-29 — Demographics: checkout location into interest taps + Areas card (PR #33)
 
