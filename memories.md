@@ -1,0 +1,50 @@
+# PetalStepsTM — Project Memory
+
+Living record of what has been built and how the pieces fit together. **Update this file in every PR that ships or changes behavior** — newest entries at the top of the changelog.
+
+## Architecture at a glance
+
+- **Storefront** — Next.js 15 + Tailwind v4 + shadcn UI on Vercel (`petal-steps-tm.vercel.app`). WhatsApp-only ordering to +260 760 732 751; prices in ZMW (unsigned integers); EU sizes 35–45; categories `matte | glossy | statement | red-bottom`.
+- **Inventory database** — a Google Sheet. Reads via the published CSV (`PRODUCTS_SHEET_CSV_URL`); writes via the bound Apps Script web app (`scripts/stock_writer.gs` → `STOCK_WRITER_URL` + `STOCK_WRITER_TOKEN`). Writes land in the sheet instantly; the storefront's published CSV lags ~1 minute.
+- **Sheet tabs** — `PRODUCTS` (MODEL/SIZE/COUNT + override cols NAME/PRICE/COLOUR/CATEGORY/PHOTO/DESC), `LOG` (interest taps + sold/restock events), `RECEIPTS` (key-guarded rows), `SUBSCRIBERS` (TS/EMAIL, case-insensitive dedupe).
+- **Admin** — `/admin` behind `ADMIN_PASSCODE` → session cookie. Tabs: stock, reports, receipts, add style, mailing list.
+- **Ordering truth** — "interest" = a client tapping *Send order on WhatsApp* (may never send); "sold" = the admin `−` tap (the trustworthy signal). Reports keep them separate.
+- **Apps Script deploy** — every `.gs` change needs Deploy → Manage deployments → ✎ → **New version**; the `/exec` URL is stable across versions. POST responses 302 to an echo URL that must be fetched with GET.
+
+## Changelog
+
+### 2026-10-29 — FAQs, mailing list, error states (PRs #15–#17)
+
+- FAQs section (`#faqs`, linked from footer) with transcribed policy answers: ordering, payment numbers, Yango bookings, couriers, 5-day hold.
+- Policy-card images (order & payment, Lusaka delivery, out-of-town) open full-size on tap via a dialog.
+- Newsletter form now really subscribes: writes to `SUBSCRIBERS` tab via the writer's `subscribe` action, deduped, honeypot + 60/hr global rate cap.
+- Admin **mailing list** tab: subscriber count, newest-first list, copy-all-emails to clipboard.
+- Failed subscriber loads show an error + Retry instead of a fake "0 subscribers" empty state.
+
+### 2026-10-28 — Add style + bulk CSV import (PRs #10–#14)
+
+- Admin **add style** tab: create a brand-new model (code, name, colour, price, category, photo, per-size starting stock) appended to `PRODUCTS` via `createProduct`; appears on the shop within ~1 min.
+- **Bulk CSV import**: template download, browser-side validation preview (bad rows flagged/skipped), one confirm writes all valid rows in batches.
+- Receipt writes hardened: every field under its own column header in one atomic row; safe on reordered/duplicate-header tabs.
+- EU 35–45 sizes enforced; prices must be whole numbers (exploit for `450.50`→K45050 closed).
+
+### 2026-10-28 — Reports, receipts, event log, email backups (PRs #8–#9, #11–#13)
+
+- `LOG` tab: every WhatsApp-order tap logged (model, size, timestamp) plus admin sold/restock actions. Client phone numbers are intentionally NOT logged.
+- Admin **reports** tab: per-day pairs sold per model, interest taps, restocks; `?day=YYYY-MM-DD` filtering.
+- Admin **receipts** tab: numbered receipts (PS-0001…) matching the printed pad — auto number, quick-add items from live stock, amount-in-words, cash/cheque/momo/bank, balance. Each gets an unguessable public link `/receipt/PS-xxxx?key=…` for WhatsApp/email sharing. Interim until ZRA smart invoicing.
+- Apps Script `dailyDigest` + `backupSheet` functions for time-driven triggers: evening sales summary email and daily/weekly CSV backup of every tab (Gmail auth prompt on first trigger run).
+- Security hardening from Devin Review rounds: write locks, global login rate limit, formula-injection escaping, key-guarded receipts, honest logEvent failures (no double-sales).
+
+### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
+
+- Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.
+- `/admin` passcode login (cookie session, rate-limited) with per-size stock `−`/`+` (markSold/restock) against the sheet.
+- Product photo + colour shown on admin stock cards.
+- **Edit** product details from admin — writes override columns (NAME/PRICE/COLOUR/CATEGORY/PHOTO/DESC) on the sheet row; clearing a field reverts to the stock-take value.
+
+## Pending / known limitations
+
+- **MTN Zambia reachability** — `*.vercel.app` is unreachable on MTN (works on Airtel); fix is a custom domain. Deferred by user.
+- **Manual ops steps after writer changes** — paste latest `stock_writer.gs` → New version deploy; optional `dailyDigest`/`backupSheet` triggers; Vercel `STOCK_WRITER_URL` must track the live `/exec` URL.
+- **Deferred**: ZRA smart-invoice integration, non-WhatsApp checkout, 4 hidden SKUs (3500-1, 9116-5, 9511-6, ZJ000628) — fixable via admin Edit.
