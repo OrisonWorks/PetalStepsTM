@@ -1222,9 +1222,15 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   const repeaters = Array.from(byPhone.entries()).filter(([, v]) => v.count > 1 && v.inRange).sort((a, b) => b[1].total - a[1].total);
 
   const heardMix = new Map<string, number>();
+  const tapsArea = new Map<string, number>();
   net.forEach(({ r }) => {
-    const m = /via (.+)$/i.exec(String(r.note || ""));
-    if (m) heardMix.set(m[1].trim(), (heardMix.get(m[1].trim()) || 0) + 1);
+    const note = String(r.note || "");
+    // Notes are built as `qty N · via X · in Y` — each segment stops at the
+    // next `·` so a later segment can't bleed into the earlier capture.
+    const h = /via ([^·]+?)\s*(?:·|$)/i.exec(note);
+    if (h) heardMix.set(h[1].trim(), (heardMix.get(h[1].trim()) || 0) + 1);
+    const loc = / · in ([^·]+?)\s*$/.exec(note);
+    if (loc) tapsArea.set(loc[1].trim(), (tapsArea.get(loc[1].trim()) || 0) + 1);
   });
   receipts.forEach((r) => {
     const h = String(r.heard || "").trim();
@@ -1238,6 +1244,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
     if (a) areaMix.set(a, (areaMix.get(a) || 0) + 1);
   });
   const maxArea = Math.max(1, ...areaMix.values());
+  const maxTapsArea = Math.max(1, ...tapsArea.values());
 
   const subsByDay = new Map<string, number>();
   subs.forEach((s) => subsByDay.set(dayOf(s.ts), (subsByDay.get(dayOf(s.ts)) || 0) + 1));
@@ -1380,12 +1387,16 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
           </div>
         </div>
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
-          <h3 className="font-semibold text-stone-800">Areas (from receipts)</h3>
+          <h3 className="font-semibold text-stone-800">Areas</h3>
+          <p className="mt-0.5 text-xs text-stone-400">Where clients order from — paid sales (receipts) and interest taps (checkout location)</p>
           <div className="mt-3 space-y-1">
             {Array.from(areaMix.entries()).sort((a, b) => b[1] - a[1]).map(([a, n]) => (
-              <Bar key={a} label={a} value={n} max={maxArea} color="bg-amber-400" />
+              <Bar key={a} label={`${a} · sold`} value={n} max={maxArea} color="bg-amber-400" />
             ))}
-            {!areaMix.size && <p className="text-sm text-stone-400">Fill the Area field on receipts to map demand</p>}
+            {Array.from(tapsArea.entries()).sort((a, b) => b[1] - a[1]).map(([a, n]) => (
+              <Bar key={`t-${a}`} label={`${a} · taps`} value={n} max={maxTapsArea} color="bg-rose-400" />
+            ))}
+            {!areaMix.size && !tapsArea.size && <p className="text-sm text-stone-400">Fill the Area field on receipts — checkout locations join automatically</p>}
           </div>
         </div>
       </div>

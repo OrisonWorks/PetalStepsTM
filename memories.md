@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Demographics: checkout location into interest taps + Areas card (PR #34)
+
+- Checkout `Location` now rides in the interest-log note (`qty N · via X · in Y`) so demand-by-area exists even before a sale. Analytics "Areas" card shows both paid sales (receipts, amber) and interest taps (checkout location, rose). Referral parsing hardened to segment-by-`·`.
+
 ### 2026-10-29 — Scrub stock counts + SKU from the client payload (PR #33)
 
 - Public product data (`page.tsx` props and `/api/products` without `all=1`) is now `ClientProduct`: per-size `"in"|"low"` flags (≤3 = low) + `lowStock` (≤5 total), no `sku`, no counts — dev tools show nothing more than the UI does. Admin keeps full `Product` via `?all=1`.
