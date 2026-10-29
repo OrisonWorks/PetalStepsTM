@@ -427,7 +427,7 @@ export function BackToTop() {
   }, []);
   if (!show) return null;
   return (
-    <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top" className="fixed bottom-24 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-stone-600 shadow-lg backdrop-blur transition hover:border-rose-400 hover:text-rose-500">
+    <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top" className="fixed bottom-36 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-stone-600 shadow-lg backdrop-blur transition hover:border-rose-400 hover:text-rose-500 md:bottom-24">
       <ChevronDown className="h-5 w-5 rotate-180" />
     </button>
   );
