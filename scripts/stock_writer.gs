@@ -30,7 +30,9 @@
  *   - Sends the newsletter to every SUBSCRIBERS address until the daily
  *     Gmail quota runs out; returns {sent, failed, remaining}. Rows whose
  *     STATUS column is marked (e.g. "stop") are skipped; a LAST_BATCH
- *     marker stops a quota-interrupted rerun resending the same subject.
+ *     marker stops a quota-interrupted rerun resending the same message
+ *     (the batch key hashes subject + body, so a later same-subject
+ *     campaign still reaches everyone).
  * POST JSON body: { token, action: "unsubscribe", email }
  *   - Marks the SUBSCRIBERS row STATUS=stop so future sends skip it.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
@@ -373,6 +375,15 @@ function safe_(value) {
   return v;
 }
 
+// Small stable hash (djb2) for campaign keys — identical input always
+// gives the same key, so newsletter retries resume the same campaign.
+function hash_(s) {
+  let h = 5381;
+  const str = String(s);
+  for (let i = 0; i < str.length; i++) h = (h * 33 + str.charCodeAt(i)) >>> 0;
+  return h.toString(16);
+}
+
 // Returns a tab's data rows as objects keyed by header name.
 function sheetRows_(ss, name) {
   const sheet = ss.getSheetByName(name);
@@ -609,8 +620,9 @@ function sendReceiptEmail(body, out) {
 // MailApp.getRemainingDailyQuota() gates the loop so a big list degrades
 // to a partial send the caller can rerun tomorrow, not an error. Rows
 // with a STATUS value (e.g. "stop") are skipped; each send stamps
-// LAST_BATCH with the subject so a quota-interrupted rerun continues
-// where it stopped instead of duplicating the first batch.
+// LAST_BATCH with a key hashed from subject+body, so a quota-interrupted
+// rerun continues where it stopped — while a NEW campaign reusing the
+// subject (different message) has a different key and sends to all.
 function sendNewsletter(body, out) {
   const subject = safe_(String(body.subject || "").trim()).slice(0, 200);
   const html = String(body.html || "").slice(0, 60000);
@@ -636,7 +648,10 @@ function sendNewsletter(body, out) {
     const emailCol = header.indexOf("email");
     const statusCol = colOf("status");
     const batchCol = colOf("last_batch");
-    const batchKey = subject.toLowerCase();
+    // Campaign identity = hash of subject + body, not the subject alone:
+    // rerunning the same send resumes it, but a different newsletter with
+    // the same subject gets a different key and reaches everyone.
+    const batchKey = hash_(subject + "|" + (text || html.slice(0, 500)));
     const data = sheet.getDataRange().getValues();
     let eligible = 0;
     let sent = 0;

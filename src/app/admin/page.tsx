@@ -152,18 +152,22 @@ function SubscribersPanel() {
   };
 
   const optOut = async (email: string) => {
-    const res = await fetch("/api/admin/unsubscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      toast.error(data.error || "Couldn't mark opt-out");
-      return;
+    try {
+      const res = await fetch("/api/admin/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        toast.error(data.error || "Couldn't mark opt-out");
+        return;
+      }
+      setSubs((list) => list.map((s) => (s.email === email ? { ...s, status: "stop" } : s)));
+      toast.success(`${email} opted out`);
+    } catch {
+      toast.error("Couldn't mark opt-out — network error");
     }
-    setSubs((list) => list.map((s) => (s.email === email ? { ...s, status: "stop" } : s)));
-    toast.success(`${email} opted out`);
   };
 
   return (
