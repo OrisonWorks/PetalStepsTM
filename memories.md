@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Analytics: revenue trend, funnel, sell-through (PR #29)
+
+- **Revenue trend** — daily receipt totals now draw a third (emerald, own-scale) bar in the sales-trend card with a K-total in the header and a "revenue K" column in the CSV export.
+- **Demand funnel** — order taps → sales logged with conversion %; receipts sit beside it as an independent count + K total (they aren't linked to stock sales — one receipt can cover several pairs), so they are NOT a conversion stage. Taps−sold is not labeled unserved demand — true open demand lives in the leads tab.
+- **Sell-through** — per-style sold ÷ (sold + stock on hand) %, top 12; only computed against LIVE sheet stock (`stockLive` prop — hidden when the catalogue is on fallback, which lacks sheet-only styles and would fake 100% sell-outs), and SKUs absent from the stock map are skipped rather than read as zero.
+
 ### 2026-10-29 — Storefront chat widget (PR #28)
 
 - **ChatWidget** — floating helper bubble (above the mobile order bar; BackToTop shifted up on mobile to clear it). Rule-based replies cover: live stock/size/price lookups (fuzzy product match + EU size extraction), ordering steps, payment numbers, Lusaka Yango collection, couriers, 5-day hold, hours, location, WhatsApp, returns, greetings. Unmatched → WhatsApp deep link. Quick-reply chips seed the conversation. This is the pattern that later plugs into WhatsApp Cloud API.
