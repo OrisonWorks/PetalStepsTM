@@ -19,25 +19,28 @@ type Subscriber = { ts: string; email: string };
 function SubscribersPanel() {
   const [subs, setSubs] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/admin/subscribers", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          toast.error(data.error || "Couldn't load subscribers");
-          return;
-        }
-        setSubs(data.subscribers || []);
-      } catch {
-        toast.error("Couldn't load subscribers");
-      } finally {
-        setLoading(false);
+  const load = async () => {
+    setLoading(true);
+    setFailed(false);
+    try {
+      const res = await fetch("/api/admin/subscribers", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setFailed(true);
+        return;
       }
-    })();
-  }, []);
+      setSubs(data.subscribers || []);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const copyAll = async () => {
     try {
@@ -53,9 +56,11 @@ function SubscribersPanel() {
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold text-stone-800">Petal List subscribers</h2>
-        <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
-          {subs.length} {subs.length === 1 ? "subscriber" : "subscribers"}
-        </span>
+        {!loading && !failed && (
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
+            {subs.length} {subs.length === 1 ? "subscriber" : "subscribers"}
+          </span>
+        )}
         {subs.length > 0 && (
           <button
             onClick={copyAll}
@@ -67,6 +72,11 @@ function SubscribersPanel() {
       </div>
       {loading ? (
         <p className="mt-4 text-sm text-stone-400">Loading…</p>
+      ) : failed ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Couldn't load the mailing list — the sheet writer may be down or out of date.
+          <button onClick={load} className="ml-3 font-semibold underline">Retry</button>
+        </div>
       ) : subs.length === 0 ? (
         <p className="mt-4 py-6 text-center text-sm text-stone-400">
           No subscribers yet — signups from the site footer appear here.
