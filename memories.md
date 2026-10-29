@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Newsletter, leads, one-click triggers (PR #27)
+
+- **Newsletter** — new `newsletter` admin tab: subject + message, pick up to 4 in-stock styles to feature, branded HTML template (logo, product cards, shop CTA) with live iframe preview. Sends to every SUBSCRIBERS row via writer `sendNewsletter` (MailApp); Gmail's ~100/day quota caps the batch and the UI reports sent/failed/remaining.
+- **Leads** — new `leads` tab: order taps (interest log rows) with no later sale of the same model+size, via `kind=leads`. Table flags "in stock — follow up" vs "sold out — restock", CSV export.
+- **installTriggers()** — run once in the Apps Script editor to create `dailyDigest` (daily ~21:00) + `backupSheet` (Sundays ~06:00); idempotent, replaces existing triggers.
+- New routes: `POST /api/admin/newsletter`, `GET /api/admin/leads` (both admin-gated).
+
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
 - AnalyticsPanel now nets the FULL log before cutting to the selected range — an undo inside the range pairs with its original outside it (both drop) instead of reading as a negative sale; dashboard and analytics totals agree.

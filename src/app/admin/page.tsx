@@ -1304,6 +1304,240 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   );
 }
 
+type Lead = { model: string; size: string; taps: number; lastTs: string };
+
+// Order taps that never became a sale — unfilled demand to follow up on
+// or restock. Matches each lead to its product for name + stock status.
+function LeadsPanel({ products }: { products: Product[] }) {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+
+  const load = async () => {
+    setState("loading");
+    try {
+      const res = await fetch("/api/admin/leads", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setState("failed");
+        return;
+      }
+      const list = (data.leads || []) as Lead[];
+      list.sort((a, b) => b.taps - a.taps || String(b.lastTs).localeCompare(String(a.lastTs)));
+      setLeads(list);
+      setState("ready");
+    } catch {
+      setState("failed");
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
+
+  const productOf = (model: string) => products.find((p) => p.sku === model);
+  const stocked = (l: Lead) => {
+    const p = productOf(l.model);
+    const s = parseInt(l.size, 10);
+    return p ? (p.stock[s] || 0) > 0 : false;
+  };
+
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-semibold text-stone-800">Order taps without a sale</h2>
+        {state === "ready" && (
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
+            {leads.length} open {leads.length === 1 ? "lead" : "leads"}
+          </span>
+        )}
+        <button
+          onClick={() =>
+            downloadCsv(
+              "leads.csv",
+              ["model", "size", "taps", "last tap"],
+              leads.map((l) => [l.model, l.size, l.taps, l.lastTs])
+            )
+          }
+          disabled={!leads.length}
+          className="ml-auto rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200 disabled:opacity-40"
+        >
+          Export CSV
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-stone-400">
+        A tap counts as filled once the same style+size is later marked sold — these are the open ones.
+      </p>
+      {state === "loading" ? (
+        <p className="mt-4 text-sm text-stone-400">Loading…</p>
+      ) : state === "failed" ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+          Couldn&apos;t load leads — the writer needs the latest stock_writer.gs (kind=leads).
+          <button onClick={load} className="ml-2 font-semibold underline">Retry</button>
+        </div>
+      ) : leads.length === 0 ? (
+        <p className="mt-4 text-sm text-stone-400">No open leads — every order tap so far became a sale.</p>
+      ) : (
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
+              <th className="pb-1">Style</th><th className="pb-1">Size</th><th className="pb-1 text-right">Taps</th>
+              <th className="pb-1 text-right">Last tap</th><th className="pb-1 text-right">Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((l) => {
+              const p = productOf(l.model);
+              const has = stocked(l);
+              return (
+                <tr key={`${l.model}-${l.size}`} className="border-t border-rose-50">
+                  <td className="py-1.5 font-semibold text-stone-700">{p?.name || l.model} <span className="font-normal text-stone-400">{l.model}</span></td>
+                  <td className="py-1.5 text-stone-500">EU {l.size}</td>
+                  <td className="py-1.5 text-right font-semibold text-rose-500">{l.taps}</td>
+                  <td className="py-1.5 text-right text-stone-400">{String(l.lastTs).slice(0, 10)}</td>
+                  <td className="py-1.5 text-right">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${has ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                      {has ? "in stock — follow up" : "sold out — restock"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// Compose + send a newsletter to every subscriber. The template wraps the
+// message + featured styles in the brand frame; the writer sends via MailApp
+// and reports sent/failed/remaining (Gmail caps ~100 recipients/day).
+function NewsletterPanel({ products }: { products: Product[] }) {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ total: number; sent: number; failed: number; remaining: number } | null>(null);
+
+  const inStock = products.filter((p) => totalPairs(p) > 0);
+  const featured = picked.map((sku) => products.find((p) => p.sku === sku)).filter(Boolean) as Product[];
+  const toggle = (sku: string) =>
+    setPicked((s) => (s.includes(sku) ? s.filter((x) => x !== sku) : s.length >= 4 ? s : [...s, sku]));
+
+  const site = typeof window === "undefined" ? "" : window.location.origin;
+  const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const paragraphs = message.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const html = `<!doctype html><html><body style="margin:0;background:#fff7f8;font-family:Georgia,serif;color:#44403c">
+<div style="max-width:560px;margin:0 auto;padding:24px">
+  <div style="text-align:center">
+    <img src="${site}/brand/logo.jpg" alt="Petal Steps" width="72" style="border-radius:16px"/>
+    <h1 style="font-size:22px;color:#f43f5e;margin:8px 0 0">Petal Steps</h1>
+  </div>
+  <div style="background:#ffffff;border:1px solid #ffe4e6;border-radius:16px;padding:20px;margin-top:16px">
+    ${subject ? `<h2 style="margin:0 0 12px;font-size:18px;color:#1c1917">${escHtml(subject)}</h2>` : ""}
+    ${paragraphs.map((p) => `<p style="font-size:14px;line-height:1.6;margin:0 0 10px">${escHtml(p).replace(/\n/g, "<br/>")}</p>`).join("")}
+    ${featured.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>${featured.map((p) => `<td align="center" style="padding:4px"><img src="${site}${p.img}" alt="${escHtml(p.name)}" width="120" style="border-radius:12px;display:block"/><div style="font-size:12px;margin-top:6px">${escHtml(p.name)}</div><div style="font-size:12px;font-weight:bold;color:#f43f5e">K${p.price}</div></td>`).join("")}</tr></table>` : ""}
+    <p style="text-align:center;margin:20px 0 0"><a href="${site}" style="background:#f43f5e;color:#fff;padding:10px 24px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:bold">Shop the collection</a></p>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#a8a29e;margin-top:16px">
+    Petal Steps · Munali Rd 4774, Lusaka · You&apos;re getting this because you joined the Petal List.<br/>
+    Reply STOP to unsubscribe, or order on WhatsApp +260 760 732 751.
+  </p>
+</div></body></html>`;
+  const text = [
+    "PETAL STEPS" + (subject ? " — " + subject : ""),
+    ...paragraphs,
+    featured.map((p) => `· ${p.name} — K${p.price}`).join("\n"),
+    "Shop: " + site,
+    "WhatsApp orders: +260 760 732 751",
+    "Reply STOP to unsubscribe.",
+  ].filter((s) => s !== "").join("\n\n");
+
+  const send = async () => {
+    if (!subject.trim() || !message.trim()) {
+      toast.error("Subject and message are required");
+      return;
+    }
+    if (!window.confirm("Send to ALL subscribers now? This can't be undone.")) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, html, text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        toast.error(data.error || "Send failed");
+        return;
+      }
+      setResult({ total: data.total, sent: data.sent, failed: data.failed, remaining: data.remaining });
+      toast.success(`Sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}`);
+    } catch {
+      toast.error("Send failed — network error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <h2 className="font-semibold text-stone-800">Newsletter</h2>
+        <p className="mt-1 text-xs text-stone-400">
+          Goes to every Petal List subscriber. Gmail sends ~100/day — if the list is bigger the rest go tomorrow (rerun the send).
+        </p>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Subject — e.g. New arrivals just landed"
+          className={`${inputCls} mt-3`}
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={"Write the message…\n\nBlank lines split paragraphs. Keep it short and warm."}
+          rows={6}
+          className={`${inputCls} mt-2 resize-y`}
+        />
+        <p className="mt-3 text-xs font-semibold text-stone-500">Feature up to 4 in-stock styles (tap to add):</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {inStock.slice(0, 24).map((p) => (
+            <button
+              key={p.sku}
+              onClick={() => toggle(p.sku)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                picked.includes(p.sku)
+                  ? "border-rose-400 bg-rose-50 text-rose-600"
+                  : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={send}
+          disabled={sending}
+          className="mt-4 rounded-lg bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
+        >
+          {sending ? "Sending…" : "Send to all subscribers"}
+        </button>
+        {result && (
+          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {result.sent} sent{result.failed ? ` · ${result.failed} failed` : ""}
+            {result.remaining ? ` · ${result.remaining} left for tomorrow (Gmail daily quota)` : ""}
+            {" · "}list total {result.total}
+          </p>
+        )}
+      </div>
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <h3 className="text-sm font-semibold text-stone-600">Preview</h3>
+        <iframe title="Newsletter preview" srcDoc={html} className="mt-2 h-[480px] w-full rounded-xl border border-stone-100" />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [state, setState] = useState<"loading" | "login" | "ready">("loading");
   const [configured, setConfigured] = useState(true);
@@ -1312,7 +1546,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
-  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list">("dashboard");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads">("dashboard");
   const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
@@ -1445,7 +1679,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list"] as const).map((v) => (
+        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -1484,6 +1718,8 @@ export default function AdminPage() {
       {view === "reports" && <div className="mt-6"><ReportsPanel /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
+      {view === "newsletter" && <div className="mt-6"><NewsletterPanel products={products} /></div>}
+      {view === "leads" && <div className="mt-6"><LeadsPanel products={products} /></div>}
       {source !== "sheet" && view === "stock" && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           The shop is on the fallback catalogue — stock writes still go to the sheet, but the site

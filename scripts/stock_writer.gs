@@ -26,14 +26,20 @@
  *   - Sends the receipt text via MailApp (to the address given).
  * POST JSON body: { token, action: "subscribe", email }
  *   - Appends to the SUBSCRIBERS tab (TS, EMAIL), deduped — the newsletter.
+ * POST JSON body: { token, action: "sendNewsletter", subject, html, text? }
+ *   - Sends the newsletter to every SUBSCRIBERS address until the daily
+ *     Gmail quota runs out; returns {sent, failed, remaining}.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
  * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
  * GET /exec?token=…&kind=receipts — all receipt rows (keys stripped).
  * GET /exec?token=…&kind=subscribers — SUBSCRIBERS rows (TS, EMAIL) as JSON.
+ * GET /exec?token=…&kind=leads — order taps (model+size) never followed
+ *   by a sale — a follow-up/demand list.
  *
- * Time-driven triggers (install once via the clock icon):
- *   dailyDigest()  — emails the day's sales/interest summary
- *   backupSheet()  — emails every tab as CSV attachments
+ * Time-driven triggers — run installTriggers() ONCE from the editor
+ * (Run ▶). It creates/updates:
+ *   dailyDigest()  — emails the day's sales/interest summary, ~21:00
+ *   backupSheet()  — emails every tab as CSV attachments, Sunday ~06:00
  * Both mail REPORT_EMAIL (Script Property) or fall back to the owner.
  *
  * Stock-take layout (one row per size): finds every row matching MODEL+SIZE,
@@ -66,6 +72,8 @@ function doPost(e) {
     if (body.action === "createReceipt") return createReceipt(body, out);
     if (body.action === "sendReceiptEmail")
       return sendReceiptEmail(body, out);
+    if (body.action === "sendNewsletter")
+      return sendNewsletter(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -524,6 +532,48 @@ function sendReceiptEmail(body, out) {
   }
 }
 
+// ---------- newsletter ----------
+
+// POST { action: "sendNewsletter", subject, html, text? }
+// Sends to every SUBSCRIBERS row. Free Gmail sends ~100 recipients/day —
+// MailApp.getRemainingDailyQuota() gates the loop so a big list degrades
+// to a partial send the caller can rerun tomorrow, not an error.
+function sendNewsletter(body, out) {
+  const subject = safe_(String(body.subject || "").trim()).slice(0, 200);
+  const html = String(body.html || "").slice(0, 60000);
+  const text = String(body.text || "").slice(0, 20000);
+  if (!subject) return out({ ok: false, error: "subject required" });
+  if (!html && !text) return out({ ok: false, error: "html or text required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(60000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const emails = sheetRows_(ss, "SUBSCRIBERS")
+      .map((r) => String(r.email || "").trim())
+      .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+    let sent = 0;
+    let failed = 0;
+    for (const email of emails) {
+      if (MailApp.getRemainingDailyQuota() <= 0) break;
+      try {
+        const plain = text || "View this email in a browser-capable client — Petal Steps.";
+        MailApp.sendEmail(email, subject, plain, html ? { htmlBody: html } : {});
+        sent++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    const remaining = emails.length - sent - failed;
+    appendLog_("newsletter", "-", "",
+      subject.slice(0, 80) + " · " + sent + " sent" +
+      (failed ? " · " + failed + " failed" : "") +
+      (remaining ? " · " + remaining + " left (quota)" : ""));
+    return out({ ok: true, total: emails.length, sent, failed, remaining });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------- read endpoints ----------
 
 // GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001 | kind=subscribers | kind=receipts
@@ -577,6 +627,29 @@ function doGet(e) {
         return copy;
       });
       return out({ ok: true, receipts: rows });
+    }
+    if (kind === "leads") {
+      // Order taps (interest) never followed by a sale of the same
+      // model+size — unfilled demand worth a follow-up or a restock.
+      const rows = sheetRows_(ss, "LOG");
+      const lastSold = {};
+      rows.forEach((r) => {
+        const key = r.model + "|" + r.size;
+        if (r.action === "sold" && (!lastSold[key] || String(r.ts) > String(lastSold[key])))
+          lastSold[key] = r.ts;
+      });
+      const leads = {};
+      rows.forEach((r) => {
+        if (r.action !== "interest") return;
+        const key = r.model + "|" + r.size;
+        // A sale AFTER the tap counts it as filled — a tap newer than
+        // the last sale is still open demand.
+        if (lastSold[key] && String(r.ts) <= String(lastSold[key])) return;
+        if (!leads[key]) leads[key] = { model: r.model, size: r.size, taps: 0, lastTs: r.ts };
+        leads[key].taps++;
+        if (String(r.ts) > String(leads[key].lastTs)) leads[key].lastTs = r.ts;
+      });
+      return out({ ok: true, leads: Object.values(leads) });
     }
     return out({ ok: false, error: "unknown kind" });
   } catch (err) {
@@ -667,6 +740,28 @@ function reportEmail_() {
     PropertiesService.getScriptProperties().getProperty("REPORT_EMAIL") ||
     Session.getActiveUser().getEmail()
   );
+}
+
+// Run ONCE from the editor (Run ▶): creates the scheduled jobs. Safe to
+// rerun — existing triggers for these functions are replaced, so nothing
+// double-fires. First run asks for the Gmail/Calendar-style authorizations
+// MailApp needs; approve once.
+function installTriggers() {
+  const handlers = ["dailyDigest", "backupSheet"];
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (handlers.indexOf(t.getHandlerFunction()) >= 0)
+      ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("dailyDigest")
+    .timeBased()
+    .everyDays(1)
+    .atHour(21)
+    .create();
+  ScriptApp.newTrigger("backupSheet")
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(6)
+    .create();
 }
 
 function csvCell_(v) {
