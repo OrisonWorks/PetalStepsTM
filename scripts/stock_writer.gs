@@ -28,6 +28,7 @@
  *   - Appends to the SUBSCRIBERS tab (TS, EMAIL), deduped — the newsletter.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
  * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
+ * GET /exec?token=…&kind=receipts — all receipt rows (keys stripped).
  * GET /exec?token=…&kind=subscribers — SUBSCRIBERS rows (TS, EMAIL) as JSON.
  *
  * Time-driven triggers (install once via the clock icon):
@@ -491,6 +492,8 @@ function createReceipt(body, out) {
     put("method", safe_(String(f.method || "")));
     put("balance", safe_(String(f.balance || "")));
     put("note", safe_(String(f.note || "")).slice(0, 300));
+    put("area", safe_(String(f.area || "")).slice(0, 100));
+    put("heard", safe_(String(f.heard || "")).slice(0, 60));
     put("key", key);
     for (let c = 0; c < row.length; c++) if (row[c] === undefined) row[c] = "";
     const rowNum = sheet.getLastRow() + 1;
@@ -523,7 +526,7 @@ function sendReceiptEmail(body, out) {
 
 // ---------- read endpoints ----------
 
-// GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001 | kind=subscribers
+// GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001 | kind=subscribers | kind=receipts
 function doGet(e) {
   const out = (o) =>
     ContentService.createTextOutput(JSON.stringify(o)).setMimeType(
@@ -564,6 +567,16 @@ function doGet(e) {
         email: r.email,
       }));
       return out({ ok: true, subscribers: rows });
+    }
+    if (kind === "receipts") {
+      // All receipts for admin analytics — key stripped so the
+      // unguessable share links are never exposed by this read.
+      const rows = sheetRows_(ss, "RECEIPTS").map((r) => {
+        const copy = Object.assign({}, r);
+        delete copy.key;
+        return copy;
+      });
+      return out({ ok: true, receipts: rows });
     }
     return out({ ok: false, error: "unknown kind" });
   } catch (err) {

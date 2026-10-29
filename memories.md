@@ -13,6 +13,15 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Admin dashboard + analytics (PR #21)
+
+- **Dashboard** (new default admin view): KPI cards — pairs in stock, sold today, order taps today, revenue today; low-stock alerts (≤5 pairs) and dead-stock list (never sold in the log); quick links.
+- **Analytics tab**: 7/14/30-day ranges — daily sold-vs-taps trend, top models sold vs interest, EU-size demand heatmap, payment mix (K), referral-source split (from checkout "how did you hear" + receipt field), area split from receipts, subscriber growth, repeat customers by phone; CSV export on the main tables.
+- New `GET /api/admin/analytics` — one call returning LOG + RECEIPTS + SUBSCRIBERS for client-side aggregation.
+- **Undo sold/restock** — every ± toast gets an Undo action that posts the inverse write.
+- **Receipt form**: client name autocomplete from past receipts (datalist), "repeat customer" badge on a phone that appears before, new **Area/city** and **How did they hear** fields → stored on the receipt row (AREA/HEARD headers auto-created).
+- `stock_writer.gs`: `kind=receipts` doGet (all rows, keys stripped) + `area`/`heard` receipt fields. **Needs one more New-version redeploy** — panels warn when it's missing and log/subscriber analytics still work without it.
+
 ### 2026-10-29 — Storefront UX Phase 1 (PR #20)
 
 - "My size" EU 35–45 filter chips in the shop — filters styles to those with stock in that size (AND-combines with category filter).

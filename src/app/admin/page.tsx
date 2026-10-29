@@ -17,6 +17,60 @@ type LogRow = { ts: string; action: string; model: string; size: string; note: s
 
 type Subscriber = { ts: string; email: string };
 
+type ReceiptRow = {
+  no: string; date: string; client: string; phone: string; items: string;
+  amount: string | number; method: string; area?: string; heard?: string;
+};
+
+type AnalyticsData = {
+  log: LogRow[];
+  receipts: ReceiptRow[];
+  subscribers: Subscriber[];
+  receiptsSupported: boolean;
+};
+
+// One shared fetch of log + receipts + subscribers for every admin panel.
+function useAnalytics() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/analytics", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        setData({
+          log: json.log || [],
+          receipts: json.receipts || [],
+          subscribers: json.subscribers || [],
+          receiptsSupported: json.receiptsSupported === true,
+        });
+      } else {
+        setData(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  return { data, loading, reload: load };
+}
+
+const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
+
+function downloadCsv(name: string, headers: string[], rows: (string | number)[][]) {
+  const esc = (v: string | number) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function SubscribersPanel() {
   const [subs, setSubs] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +260,7 @@ function ReportsPanel() {
 }
 
 function ReceiptPanel({ products }: { products: Product[] }) {
+  const { data: aData } = useAnalytics();
   const [form, setForm] = useState({
     client: "",
     phone: "",
@@ -216,7 +271,11 @@ function ReceiptPanel({ products }: { products: Product[] }) {
     method: "Cash",
     balance: "",
     note: "",
+    area: "",
+    heard: "",
   });
+  const knownPhones = new Set((aData?.receipts || []).map((r) => String(r.phone || "").replace(/[^0-9]/g, "")).filter(Boolean));
+  const isRepeat = form.phone.replace(/[^0-9]/g, "").length > 5 && knownPhones.has(form.phone.replace(/[^0-9]/g, ""));
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ no: string; key: string } | null>(null);
   const [skuPick, setSkuPick] = useState("");
@@ -264,7 +323,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
 
   const reset = () => {
     setCreated(null);
-    setForm({ client: "", phone: "", email: "", items: "", amount: "", words: "", method: "Cash", balance: "", note: "" });
+    setForm({ client: "", phone: "", email: "", items: "", amount: "", words: "", method: "Cash", balance: "", note: "", area: "", heard: "" });
   };
 
   if (created) {
@@ -307,9 +366,27 @@ function ReceiptPanel({ products }: { products: Product[] }) {
   return (
     <form onSubmit={create} className="grid gap-3 rounded-2xl border border-rose-100 bg-white p-4 sm:grid-cols-2">
       <h2 className="font-semibold text-stone-800 sm:col-span-2">New receipt</h2>
-      <label className="text-xs font-semibold text-stone-500">Received from<input required value={form.client} onChange={set("client")} className={inputCls} placeholder="Client name" /></label>
-      <label className="text-xs font-semibold text-stone-500">Client WhatsApp number<input value={form.phone} onChange={set("phone")} className={inputCls} placeholder="e.g. 260971234567" /></label>
+      <label className="text-xs font-semibold text-stone-500">Received from<input required list="past-clients" value={form.client} onChange={set("client")} className={inputCls} placeholder="Client name" /></label>
+      <datalist id="past-clients">
+        {Array.from(new Set((aData?.receipts || []).map((r) => String(r.client || "").trim()).filter(Boolean))).map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+      <label className="text-xs font-semibold text-stone-500">Client WhatsApp number{isRepeat && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-600">repeat customer</span>}<input value={form.phone} onChange={set("phone")} className={inputCls} placeholder="e.g. 260971234567" /></label>
       <label className="text-xs font-semibold text-stone-500">Client email (optional — sends a copy)<input type="email" value={form.email} onChange={set("email")} className={inputCls} placeholder="client@example.com" /></label>
+      <label className="text-xs font-semibold text-stone-500">Area / city<input value={form.area} onChange={set("area")} className={inputCls} placeholder="e.g. Woodlands, Kitwe, Ndola" /></label>
+      <label className="text-xs font-semibold text-stone-500">How did they hear?
+        <select value={form.heard} onChange={set("heard")} className={inputCls}>
+          <option value="">—</option>
+          <option>Facebook</option>
+          <option>Instagram</option>
+          <option>TikTok</option>
+          <option>WhatsApp status</option>
+          <option>A friend</option>
+          <option>Walk-in / saw the shop</option>
+          <option>Other</option>
+        </select>
+      </label>
       <label className="text-xs font-semibold text-stone-500">Method
         <select value={form.method} onChange={set("method")} className={inputCls}>
           <option>Cash</option>
@@ -825,6 +902,331 @@ function EditForm({
   );
 }
 
+
+function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">{label}</p>
+      <p className="mt-1 font-display text-2xl font-semibold text-stone-800">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-stone-400">{hint}</p>}
+    </div>
+  );
+}
+
+function DashboardPanel({ products, analytics, go }: {
+  products: Product[];
+  analytics: ReturnType<typeof useAnalytics>;
+  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list") => void;
+}) {
+  const { data, loading, reload } = analytics;
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+  const log = data?.log || [];
+  const receipts = data?.receipts || [];
+  const soldToday = log.filter((r) => r.action === "sold" && dayOf(r.ts) === today).length;
+  const soldWeek = log.filter((r) => r.action === "sold" && dayOf(r.ts) >= weekAgo).length;
+  const tapsToday = log.filter((r) => r.action === "interest" && dayOf(r.ts) === today).length;
+  const revToday = receipts
+    .filter((r) => dayOf(r.date || "") === today)
+    .reduce((a, r) => a + (parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0), 0);
+  const lowStock = products.filter((p) => totalPairs(p) > 0 && totalPairs(p) <= 5);
+  const soldModels = new Set(log.filter((r) => r.action === "sold").map((r) => r.model));
+  const deadStock = products.filter((p) => totalPairs(p) > 0 && !soldModels.has(p.sku));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi label="Pairs in stock" value={products.reduce((a, p) => a + totalPairs(p), 0)} hint={`${products.length} styles`} />
+        <Kpi label="Pairs sold today" value={soldToday} hint={`${soldWeek} in last 7 days`} />
+        <Kpi label="Order taps today" value={tapsToday} hint="WhatsApp orders opened" />
+        <Kpi label="Revenue today" value={`K${revToday}`} hint={data && !data.receiptsSupported ? "redeploy writer for receipts" : undefined} />
+      </div>
+      {data && !data.receiptsSupported && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Receipt analytics need the latest stock_writer.gs redeployed (kind=receipts). Sales and subscriber data still work.
+        </p>
+      )}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-stone-800">Low stock alerts</h3>
+            <button onClick={() => go("stock")} className="text-xs font-semibold text-rose-500">Open stock →</button>
+          </div>
+          {lowStock.length === 0 ? (
+            <p className="mt-3 text-sm text-stone-400">Nothing running low — every style has 6+ pairs.</p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {lowStock.map((p) => (
+                <li key={p.sku} className="flex justify-between rounded-lg bg-amber-50 px-3 py-1.5 text-sm">
+                  <span className="font-semibold text-stone-700">{p.name} <span className="text-stone-400">({p.sku})</span></span>
+                  <span className="font-bold text-amber-600">{totalPairs(p)} left</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-stone-800">Dead stock</h3>
+            <button onClick={() => go("analytics")} className="text-xs font-semibold text-rose-500">Analytics →</button>
+          </div>
+          {loading ? (
+            <p className="mt-3 text-sm text-stone-400">Loading…</p>
+          ) : deadStock.length === 0 ? (
+            <p className="mt-3 text-sm text-stone-400">Every stocked style has sold at least once in the log.</p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {deadStock.map((p) => (
+                <li key={p.sku} className="flex justify-between rounded-lg bg-stone-50 px-3 py-1.5 text-sm">
+                  <span className="font-semibold text-stone-700">{p.name} <span className="text-stone-400">({p.sku})</span></span>
+                  <span className="text-stone-400">no sales logged</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(["stock", "analytics", "receipts", "add", "list"] as const).map((v) => (
+          <button key={v} onClick={() => go(v)} className="rounded-full border border-rose-200 bg-white px-4 py-1.5 text-sm font-semibold text-stone-600 hover:border-rose-400">
+            {v === "add" ? "add style" : v === "list" ? "mailing list" : v} →
+          </button>
+        ))}
+        <button onClick={reload} className="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-semibold text-stone-500 hover:border-stone-400">
+          Refresh data
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Bar({ label, value, max, color = "bg-rose-400" }: { label: string; value: number; max: number; color?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="w-20 shrink-0 truncate text-stone-500">{label}</span>
+      <div className="h-3.5 flex-1 rounded-full bg-stone-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${max ? Math.max(2, (value / max) * 100) : 0}%` }} />
+      </div>
+      <span className="w-10 shrink-0 text-right font-semibold text-stone-700">{value}</span>
+    </div>
+  );
+}
+
+function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalytics> }) {
+  const { data, loading, reload } = analytics;
+  const [range, setRange] = useState(14);
+  if (loading || !data) {
+    return (
+      <div className="rounded-2xl border border-rose-100 bg-white p-6 text-center">
+        <p className="text-sm text-stone-400">{loading ? "Loading analytics…" : "Could not load analytics — check the writer deployment."}</p>
+        {!loading && <button onClick={reload} className="mt-3 rounded-lg bg-rose-500 px-4 py-1.5 text-sm font-semibold text-white">Retry</button>}
+      </div>
+    );
+  }
+  const from = new Date(Date.now() - (range - 1) * 864e5).toISOString().slice(0, 10);
+  const log = data.log.filter((r) => dayOf(r.ts) >= from);
+  const receipts = data.receipts.filter((r) => dayOf(r.date || "") >= from);
+  const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
+
+  const perDay = new Map<string, { sold: number; taps: number }>();
+  log.forEach((r) => {
+    const d = dayOf(r.ts);
+    const e = perDay.get(d) || { sold: 0, taps: 0 };
+    if (r.action === "sold") e.sold += 1;
+    if (r.action === "interest") e.taps += 1;
+    perDay.set(d, e);
+  });
+  const days = Array.from({ length: range }, (_, i) => {
+    const d = new Date(Date.now() - (range - 1 - i) * 864e5).toISOString().slice(0, 10);
+    return { d, ...(perDay.get(d) || { sold: 0, taps: 0 }) };
+  });
+  const maxDay = Math.max(1, ...days.map((x) => Math.max(x.sold, x.taps)));
+
+  const soldByModel = new Map<string, number>();
+  const tapsByModel = new Map<string, number>();
+  log.forEach((r) => {
+    if (r.action === "sold") soldByModel.set(r.model, (soldByModel.get(r.model) || 0) + 1);
+    if (r.action === "interest") tapsByModel.set(r.model, (tapsByModel.get(r.model) || 0) + 1);
+  });
+  const topModels = Array.from(new Set([...soldByModel.keys(), ...tapsByModel.keys()]))
+    .map((m) => ({ m, sold: soldByModel.get(m) || 0, taps: tapsByModel.get(m) || 0 }))
+    .sort((a, b) => b.sold - a.sold || b.taps - a.taps)
+    .slice(0, 12);
+
+  const sizeDemand = new Map<number, number>();
+  log.forEach((r) => {
+    if (r.action !== "sold" && r.action !== "interest") return;
+    const s = parseInt(r.size, 10);
+    if (s >= 35 && s <= 45) sizeDemand.set(s, (sizeDemand.get(s) || 0) + 1);
+  });
+  const maxSize = Math.max(1, ...sizeDemand.values());
+
+  const payMix = new Map<string, number>();
+  receipts.forEach((r) => {
+    const m = String(r.method || "—");
+    payMix.set(m, (payMix.get(m) || 0) + (parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0));
+  });
+  const maxPay = Math.max(1, ...payMix.values());
+
+  const byPhone = new Map<string, { name: string; count: number; total: number }>();
+  receipts.forEach((r) => {
+    const ph = String(r.phone || "").replace(/[^0-9+]/g, "");
+    if (!ph) return;
+    const e = byPhone.get(ph) || { name: String(r.client || ""), count: 0, total: 0 };
+    e.count += 1;
+    e.total += parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0;
+    byPhone.set(ph, e);
+  });
+  const repeaters = Array.from(byPhone.entries()).filter(([, v]) => v.count > 1).sort((a, b) => b[1].total - a[1].total);
+
+  const heardMix = new Map<string, number>();
+  log.forEach((r) => {
+    const m = /via (.+)$/i.exec(String(r.note || ""));
+    if (m) heardMix.set(m[1].trim(), (heardMix.get(m[1].trim()) || 0) + 1);
+  });
+  receipts.forEach((r) => {
+    const h = String(r.heard || "").trim();
+    if (h) heardMix.set(h, (heardMix.get(h) || 0) + 1);
+  });
+  const maxHeard = Math.max(1, ...heardMix.values());
+
+  const areaMix = new Map<string, number>();
+  receipts.forEach((r) => {
+    const a = String(r.area || "").trim();
+    if (a) areaMix.set(a, (areaMix.get(a) || 0) + 1);
+  });
+  const maxArea = Math.max(1, ...areaMix.values());
+
+  const subsByDay = new Map<string, number>();
+  subs.forEach((s) => subsByDay.set(dayOf(s.ts), (subsByDay.get(dayOf(s.ts)) || 0) + 1));
+  const maxSubs = Math.max(1, ...subsByDay.values());
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-semibold text-stone-800">Analytics</h2>
+        {[7, 14, 30].map((d) => (
+          <button key={d} onClick={() => setRange(d)} className={`rounded-full px-3 py-1 text-xs font-semibold ${range === d ? "bg-rose-500 text-white" : "bg-stone-100 text-stone-600"}`}>
+            {d}d
+          </button>
+        ))}
+        <button onClick={reload} className="ml-auto rounded-lg border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-500">Refresh</button>
+      </div>
+      {!data.receiptsSupported && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Receipt revenue/mix/areas need the latest stock_writer.gs redeployed (kind=receipts). Log + subscriber analytics work now.
+        </p>
+      )}
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-stone-800">Sales trend — sold vs order taps per day</h3>
+          <button onClick={() => downloadCsv(`petal-daily-${range}d.csv`, ["date", "sold", "order taps"], days.map((x) => [x.d, x.sold, x.taps]))} className="text-xs font-semibold text-rose-500">Export CSV</button>
+        </div>
+        <div className="mt-3 space-y-1">
+          {days.map((x) => (
+            <div key={x.d} className="flex items-center gap-2 text-xs">
+              <span className="w-16 shrink-0 text-stone-400">{x.d.slice(5)}</span>
+              <div className="flex h-4 flex-1 gap-0.5">
+                <div className="rounded bg-rose-400" style={{ width: `${(x.sold / maxDay) * 50}%` }} title={`${x.sold} sold`} />
+                <div className="rounded bg-stone-300" style={{ width: `${(x.taps / maxDay) * 50}%` }} title={`${x.taps} taps`} />
+              </div>
+              <span className="w-16 shrink-0 text-right text-stone-500">{x.sold} / {x.taps}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-stone-400"><span className="inline-block h-2 w-2 rounded bg-rose-400" /> sold · <span className="inline-block h-2 w-2 rounded bg-stone-300" /> order taps (sold / taps)</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-stone-800">Top models — sold vs interest</h3>
+            <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "sold", "order taps"], topModels.map((t) => [t.m, t.sold, t.taps]))} className="text-xs font-semibold text-rose-500">CSV</button>
+          </div>
+          <table className="mt-3 w-full text-sm">
+            <tbody>
+              {topModels.map((t) => (
+                <tr key={t.m} className="border-t border-rose-50">
+                  <td className="py-1.5 font-semibold text-stone-700">{t.m}</td>
+                  <td className="py-1.5 text-right">{t.sold}</td>
+                  <td className="py-1.5 text-right text-stone-400">{t.taps}</td>
+                </tr>
+              ))}
+              {!topModels.length && <tr><td className="py-4 text-center text-stone-400">No activity in range</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-rose-100 bg-white p-4">
+            <h3 className="font-semibold text-stone-800">Size demand (sold + taps)</h3>
+            <div className="mt-3 space-y-1">
+              {Array.from({ length: 11 }, (_, i) => 35 + i).map((s) => (
+                <Bar key={s} label={`EU ${s}`} value={sizeDemand.get(s) || 0} max={maxSize} />
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-rose-100 bg-white p-4">
+            <h3 className="font-semibold text-stone-800">Subscriber growth ({data.subscribers.length} total)</h3>
+            <div className="mt-3 space-y-1">
+              {Array.from(subsByDay.entries()).sort().map(([d, n]) => (
+                <Bar key={d} label={d.slice(5)} value={n} max={maxSubs} color="bg-emerald-400" />
+              ))}
+              {!subsByDay.size && <p className="text-sm text-stone-400">No signups in range</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <h3 className="font-semibold text-stone-800">Payment mix (K)</h3>
+          <div className="mt-3 space-y-1">
+            {Array.from(payMix.entries()).sort((a, b) => b[1] - a[1]).map(([m, v]) => (
+              <Bar key={m} label={m} value={v} max={maxPay} color="bg-violet-400" />
+            ))}
+            {!payMix.size && <p className="text-sm text-stone-400">No receipts in range</p>}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <h3 className="font-semibold text-stone-800">Referral source</h3>
+          <div className="mt-3 space-y-1">
+            {Array.from(heardMix.entries()).sort((a, b) => b[1] - a[1]).map(([h, n]) => (
+              <Bar key={h} label={h} value={n} max={maxHeard} color="bg-sky-400" />
+            ))}
+            {!heardMix.size && <p className="text-sm text-stone-400">None captured yet — appears once clients pick a source at checkout</p>}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <h3 className="font-semibold text-stone-800">Areas (from receipts)</h3>
+          <div className="mt-3 space-y-1">
+            {Array.from(areaMix.entries()).sort((a, b) => b[1] - a[1]).map(([a, n]) => (
+              <Bar key={a} label={a} value={n} max={maxArea} color="bg-amber-400" />
+            ))}
+            {!areaMix.size && <p className="text-sm text-stone-400">Fill the Area field on receipts to map demand</p>}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-stone-800">Repeat customers ({repeaters.length})</h3>
+          <button onClick={() => downloadCsv("petal-repeat-customers.csv", ["phone", "name", "receipts", "total K"], repeaters.map(([ph, v]) => [ph, v.name, v.count, v.total]))} className="text-xs font-semibold text-rose-500">CSV</button>
+        </div>
+        <table className="mt-3 w-full text-sm">
+          <tbody>
+            {repeaters.slice(0, 10).map(([ph, v]) => (
+              <tr key={ph} className="border-t border-rose-50">
+                <td className="py-1.5 font-semibold text-stone-700">{v.name}</td>
+                <td className="py-1.5 text-stone-400">{ph}</td>
+                <td className="py-1.5 text-right">{v.count} receipts</td>
+                <td className="py-1.5 text-right font-semibold">K{v.total}</td>
+              </tr>
+            ))}
+            {!repeaters.length && <tr><td className="py-4 text-center text-stone-400">No repeat customers yet (matched by phone)</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [state, setState] = useState<"loading" | "login" | "ready">("loading");
   const [configured, setConfigured] = useState(true);
@@ -833,7 +1235,8 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
-  const [view, setView] = useState<"stock" | "reports" | "receipts" | "add" | "list">("stock");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list">("dashboard");
+  const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
     const res = await fetch("/api/products?all=1", { cache: "no-store" });
@@ -901,7 +1304,9 @@ export default function AdminPage() {
               }
         )
       );
-      toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`);
+      toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`, {
+        action: { label: "Undo", onClick: () => adjust(p, size, -delta) },
+      });
     } catch {
       toast.error("Update failed");
     } finally {
@@ -961,8 +1366,8 @@ export default function AdminPage() {
           Sign out
         </button>
       </div>
-      <nav className="mt-4 flex gap-2">
-        {(["stock", "add", "reports", "receipts", "list"] as const).map((v) => (
+      <nav className="mt-4 flex flex-wrap gap-2">
+        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -974,6 +1379,12 @@ export default function AdminPage() {
           </button>
         ))}
       </nav>
+      {view === "dashboard" && (
+        <div className="mt-6"><DashboardPanel products={products} analytics={analytics} go={setView} /></div>
+      )}
+      {view === "analytics" && (
+        <div className="mt-6"><AnalyticsPanel analytics={analytics} /></div>
+      )}
       {view === "add" && (
         <div className="mt-6">
           <AddStylePanel
