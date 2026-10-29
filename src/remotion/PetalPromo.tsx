@@ -58,7 +58,7 @@ export function PetalPromo() {
         <Scene bg="#ffffff">
           <Img src={SHOE_1} style={{ width: 520, height: 560, objectFit: "cover", borderRadius: 28, margin: "0 auto", boxShadow: "0 24px 50px rgba(231,84,128,.25)" }} />
           <h2 style={{ ...title, fontSize: 52, marginTop: 24 }}>Black Red-Bottom Stiletto</h2>
-          <p style={{ ...sub, color: "#c73e68", fontWeight: 700 }}>K650 · EU 38–43 · Only a few left</p>
+          <p style={{ ...sub, color: "#c73e68", fontWeight: 700 }}>K650 · EU 38–43 · In stock</p>
         </Scene>
       </Sequence>
       <Sequence from={150} durationInFrames={75}>
