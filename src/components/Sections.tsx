@@ -24,8 +24,7 @@ export function Hero({ styles = 29, pairs = 247 }: { styles?: number; pairs?: nu
     <section id="top" className="bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
       <div className="mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
         <div>
-          <p className="font-script text-5xl leading-none text-stone-900">Petal Steps</p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.35em] text-stone-500">By Thandiwe Mwaba</p>
+          <Image src="/brand/logo-mark.png" alt="Petal Steps by Thandiwe Mwaba" width={1013} height={552} priority className="h-24 w-auto" />
           <h1 className="font-display mt-5 text-5xl font-semibold leading-[1.05] sm:text-6xl">Women&apos;s heels that <span className="italic text-rose-500">bloom</span> with every step.</h1>
           <p className="mt-5 max-w-lg text-lg text-stone-600">{styles} heel styles in stock in Lusaka — matte, glossy, statement florals and signature red bottoms. EU 35–45, K450–K650. What you see is what&apos;s actually on the shelf.</p>
           <div className="mt-7 flex flex-wrap gap-3">
@@ -391,8 +390,13 @@ export function Footer() {
     <footer className="bg-stone-900 text-rose-100">
       <div className="mx-auto grid w-[min(1180px,92%)] gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="font-script text-3xl text-white">Petal Steps</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-rose-300">By Thandiwe Mwaba</p>
+          <div className="flex items-center gap-3">
+            <Image src="/brand/logo.jpg" alt="Petal Steps by Thandiwe Mwaba" width={1080} height={1080} className="h-12 w-12 rounded-full" />
+            <div>
+              <p className="font-script text-3xl text-white">Petal Steps</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-rose-300">By Thandiwe Mwaba</p>
+            </div>
+          </div>
           <p className="mt-2 max-w-xs text-sm text-rose-200/70">Women&apos;s heels that bloom with every step. Lusaka, Zambia.</p>
         </div>
         <div><h4 className="font-display mb-3 font-semibold text-white">Shop</h4>{[["All heels", "#shop"], ["Matte", "#categories"], ["Glossy", "#categories"], ["Red Bottom", "#categories"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
