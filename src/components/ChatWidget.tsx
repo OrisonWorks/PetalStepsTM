@@ -34,17 +34,21 @@ function matchProduct(q: string, products: Product[]): { hit: Product | null; ca
   return { hit: candidates.length === 1 ? candidates[0] : null, candidates };
 }
 
-function reply(raw: string, products: Product[]): Omit<Msg, "from"> {
+function reply(raw: string, products: Product[], pendingSize?: number | null): Omit<Msg, "from"> & { pendingSize?: number | null } {
   const q = raw.toLowerCase();
   const sizeMatch = /\b(3[5-9]|4[0-5])\b/.exec(q);
-  const size = sizeMatch ? parseInt(sizeMatch[1], 10) : null;
+  // A size in this message wins; otherwise fall back to the size carried
+  // over from the question the bot just asked to clarify.
+  const size = sizeMatch ? parseInt(sizeMatch[1], 10) : pendingSize ?? null;
   const { hit: p, candidates } = matchProduct(q, products);
 
   // Several styles tie on the words given ("a stiletto", "something red") —
-  // ask which one instead of quoting an arbitrary style's stock.
+  // ask which one instead of quoting an arbitrary style's stock. The size
+  // rides along in pendingSize so the next message still answers the
+  // original lookup.
   if (!p && candidates.length > 1) {
     const names = candidates.slice(0, 4).map((c) => c.name).join(", ");
-    return { text: `We have a few like that — which one? ${names}. ${size ? `(Still looking for EU ${size}.)` : "Tell me the name or code and I'll check stock."}` };
+    return { text: `We have a few like that — which one? ${names}. ${size ? `(Still looking for EU ${size}.)` : "Tell me the name or code and I'll check stock."}`, pendingSize: size };
   }
   const stockLine = (prod: Product) => {
     const sizes = Object.entries(prod.stock)
@@ -99,12 +103,17 @@ export function ChatWidget({ products }: { products: Product[] }) {
     { from: "bot", text: "Hi! I'm the Petal Steps helper — ask about sizes in stock, prices, payment or delivery." },
   ]);
   const endRef = useRef<HTMLDivElement>(null);
+  // Size carried over from the last question, so a follow-up that just
+  // names the style still answers the original "EU 38?" lookup.
+  const pendingSizeRef = useRef<number | null>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, open]);
 
   const send = (text: string) => {
     const t = text.trim();
     if (!t) return;
-    setMsgs((m) => [...m, { from: "user", text: t }, { from: "bot" as const, ...reply(t, products) }]);
+    const r = reply(t, products, pendingSizeRef.current);
+    pendingSizeRef.current = r.pendingSize ?? null;
+    setMsgs((m) => [...m, { from: "user", text: t }, { from: "bot" as const, text: r.text, link: r.link }]);
     setInput("");
   };
 
