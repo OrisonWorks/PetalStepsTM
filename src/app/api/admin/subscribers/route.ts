@@ -25,9 +25,10 @@ export async function GET() {
       );
     }
     const list = (Array.isArray(data.subscribers) ? data.subscribers : [])
-      .map((r: { ts?: unknown; email?: unknown }) => ({
+      .map((r: { ts?: unknown; email?: unknown; status?: unknown }) => ({
         ts: String(r?.ts || ""),
         email: String(r?.email || "").trim(),
+        status: String(r?.status || "").trim(),
       }))
       .filter((r: { email: string }) => r.email);
     return NextResponse.json({ ok: true, subscribers: list });
