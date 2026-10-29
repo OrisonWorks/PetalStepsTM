@@ -32,6 +32,8 @@ export async function POST(req: Request) {
     method: String(body.method || "").slice(0, 60),
     balance: String(body.balance || "").slice(0, 40),
     note: String(body.note || "").slice(0, 300),
+    area: String(body.area || "").slice(0, 100),
+    heard: String(body.heard || "").slice(0, 60),
   };
   const origin = new URL(req.url).origin;
   const call = async (payload: object) => {

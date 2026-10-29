@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { BadgeCheck, ChevronDown, Clock, Facebook, MapPin, MessageCircle, PiggyBank, ShieldCheck, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PromoPlayer } from "@/components/PromoPlayer";
-import { FB_URL, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
+import { useCart } from "@/context/cart-context";
+import { FB_URL, money, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
 import type { Filter } from "@/lib/products";
 
 const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
@@ -413,5 +414,32 @@ export function Footer() {
         <MessageCircle className="h-6 w-6" />
       </a>
     </footer>
+  );
+}
+
+export function BackToTop() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShow(window.scrollY > 600);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top" className="fixed bottom-24 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-stone-600 shadow-lg backdrop-blur transition hover:border-rose-400 hover:text-rose-500">
+      <ChevronDown className="h-5 w-5 rotate-180" />
+    </button>
+  );
+}
+
+export function MobileOrderBar() {
+  const { count, subtotal, open, setOpen } = useCart();
+  if (!count || open) return null;
+  return (
+    <button onClick={() => setOpen(true)} className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-full bg-stone-900 px-5 py-3.5 text-sm font-bold text-white shadow-xl md:hidden">
+      <span>Your bag · {count} item{count === 1 ? "" : "s"} · {money(subtotal)}</span>
+      <span className="rounded-full bg-rose-500 px-4 py-1.5">Order →</span>
+    </button>
   );
 }
