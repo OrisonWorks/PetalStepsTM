@@ -28,7 +28,7 @@ export function QuickView({ product, onClose }: { product: Product | null; onClo
               <DialogDescription>{product.desc}</DialogDescription>
               <div className="flex items-baseline gap-2">
                 <strong className="text-2xl text-rose-600">{money(product.price)}</strong>
-                <span className="text-sm text-stone-400">ZMW · SKU {product.sku}</span>
+                <span className="text-sm text-stone-400">ZMW</span>
               </div>
               <p className="text-sm text-stone-500">In stock now. Sizes shown are in stock — once a size sells out it disappears.</p>
               <p className="mt-1 text-sm font-bold">Select EU size</p>
