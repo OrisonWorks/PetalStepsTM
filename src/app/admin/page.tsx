@@ -1087,12 +1087,15 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
     );
   }
   const from = new Date(Date.now() - (range - 1) * 864e5).toISOString().slice(0, 10);
-  const log = data.log.filter((r) => dayOf(r.ts) >= from);
+  // Net over the FULL log, then cut to range — an undo inside the range can
+  // still find its original outside it (both drop out) instead of reading as
+  // a negative sale. Computed once for all three summaries below.
+  const net = netLogRows(data.log).filter(({ r }) => dayOf(r.ts) >= from);
   const receipts = data.receipts.filter((r) => dayOf(r.date || "") >= from);
   const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
 
   const perDay = new Map<string, { sold: number; taps: number }>();
-  netLogRows(log).forEach(({ r, kind, sign }) => {
+  net.forEach(({ r, kind, sign }) => {
     const d = dayOf(r.ts);
     const e = perDay.get(d) || { sold: 0, taps: 0 };
     if (kind === "sold") e.sold += sign;
@@ -1107,7 +1110,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
 
   const soldByModel = new Map<string, number>();
   const tapsByModel = new Map<string, number>();
-  netLogRows(log).forEach(({ r, kind, sign }) => {
+  net.forEach(({ r, kind, sign }) => {
     if (kind === "sold") soldByModel.set(r.model, (soldByModel.get(r.model) || 0) + sign);
     if (kind === "interest") tapsByModel.set(r.model, (tapsByModel.get(r.model) || 0) + 1);
   });
@@ -1117,7 +1120,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
     .slice(0, 12);
 
   const sizeDemand = new Map<number, number>();
-  netLogRows(log).forEach(({ r, kind, sign }) => {
+  net.forEach(({ r, kind, sign }) => {
     const s = parseInt(r.size, 10);
     if (!(s >= 35 && s <= 45)) return;
     if (kind === "sold" || kind === "interest") sizeDemand.set(s, (sizeDemand.get(s) || 0) + sign);
@@ -1149,7 +1152,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   const repeaters = Array.from(byPhone.entries()).filter(([, v]) => v.count > 1 && v.inRange).sort((a, b) => b[1].total - a[1].total);
 
   const heardMix = new Map<string, number>();
-  log.forEach((r) => {
+  net.forEach(({ r }) => {
     const m = /via (.+)$/i.exec(String(r.note || ""));
     if (m) heardMix.set(m[1].trim(), (heardMix.get(m[1].trim()) || 0) + 1);
   });

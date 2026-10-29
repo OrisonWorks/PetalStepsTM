@@ -13,6 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Review fixes for PR #25 (PR #26)
+
+- AnalyticsPanel now nets the FULL log before cutting to the selected range — an undo inside the range pairs with its original outside it (both drop) instead of reading as a negative sale; dashboard and analytics totals agree.
+- `netLogRows` computed once per render and shared across the trend/top-model/size-demand/referral summaries (was 3 separate O(n²) passes).
+
 ### 2026-10-29 — Review fixes for PR #24 (PR #25)
 
 - `netLogRows()` pairs each `undo` with the original write it reversed (same model+size, mirror-image `a→b` note) and drops BOTH — the sale is removed from the day it actually happened rather than netted off the undo's day. Unpaired undos keep the -1 fallback.
