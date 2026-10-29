@@ -24,7 +24,7 @@ export function CartDrawer() {
       fetch("/api/log-interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: i.name, size: i.size, note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}${form.location.trim() ? ` · in ${form.location.trim().slice(0, 40)}` : ""}` }),
+        body: JSON.stringify({ model: i.name, size: i.size, note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}${form.location.trim() ? ` · in ${form.location.trim().replace(/[·\n]/g, ",").slice(0, 40)}` : ""}` }),
         keepalive: true,
       }).catch(() => {})
     );

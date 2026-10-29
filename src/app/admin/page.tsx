@@ -1227,7 +1227,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
     const note = String(r.note || "");
     // Notes are built as `qty N · via X · in Y` — each segment stops at the
     // next `·` so a later segment can't bleed into the earlier capture.
-    const h = /via ([^·]+?)\s*(?:·|$)/i.exec(note);
+    const h = /(?:^| · )via ([^·]+?)\s*(?:·|$)/i.exec(note);
     if (h) heardMix.set(h[1].trim(), (heardMix.get(h[1].trim()) || 0) + 1);
     const loc = / · in ([^·]+?)\s*$/.exec(note);
     if (loc) tapsArea.set(loc[1].trim(), (tapsArea.get(loc[1].trim()) || 0) + 1);
