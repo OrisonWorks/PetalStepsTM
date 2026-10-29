@@ -73,6 +73,31 @@ const countAction = (r: LogRow): { kind: string; sign: number } => {
     : { kind: "undo", sign: 1 };
 };
 
+// Pairs each `undo` with the original write it reversed — same model+size
+// and the mirror-image note — and zeroes BOTH, so the sale is removed from
+// the day it happened (not netted off the undo's day). An undo whose
+// original predates the fetched window keeps its -1 fallback.
+type NetRow = { r: LogRow; kind: string; sign: number };
+const netLogRows = (rows: LogRow[]): NetRow[] => {
+  const out: NetRow[] = rows.map((r) => ({ r, ...countAction(r) }));
+  for (let i = out.length - 1; i >= 0; i--) {
+    const u = out[i];
+    if (u.r.action !== "undo" || u.kind === "undo") continue;
+    const m = String(u.r.note).split("→").map((x) => parseInt(x, 10));
+    const mirror = `${m[1]}→${m[0]}`;
+    for (let j = i - 1; j >= 0; j--) {
+      const o = out[j];
+      if (o.sign === 0 || o.r.action !== u.kind) continue;
+      if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) && String(o.r.note) === mirror) {
+        o.sign = 0;
+        u.sign = 0;
+        break;
+      }
+    }
+  }
+  return out;
+};
+
 function downloadCsv(name: string, headers: string[], rows: (string | number)[][]) {
   const esc = (v: string | number) => {
     let s = String(v);
@@ -208,12 +233,12 @@ function ReportsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Net counts: `undo` rows decrement the action they reversed.
+  // Net counts: undo+original pairs drop out entirely; unpaired undos
+  // decrement the action they reversed.
   const net = { sold: 0, interest: 0, restock: 0 };
   const byModel = new Map<string, number>();
   const interestByModel = new Map<string, number>();
-  rows.forEach((r) => {
-    const { kind, sign } = countAction(r);
+  netLogRows(rows).forEach(({ r, kind, sign }) => {
     if (kind === "sold" || kind === "restock" || kind === "interest") {
       net[kind as keyof typeof net] += sign;
       if (kind === "sold") byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
@@ -946,12 +971,10 @@ function DashboardPanel({ products, analytics, go }: {
   const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
   const log = data?.log || [];
   const receipts = data?.receipts || [];
-  const logOk = data ? data.logSupported !== false : true;
+  const logOk = data ? data.logSupported === true : false;
+  const net = netLogRows(log);
   const netSold = (minDay: string) =>
-    log.reduce((a, r) => {
-      const c = countAction(r);
-      return c.kind === "sold" && dayOf(r.ts) >= minDay ? a + c.sign : a;
-    }, 0);
+    net.reduce((a, { r, kind, sign }) => (kind === "sold" && dayOf(r.ts) >= minDay ? a + sign : a), 0);
   const soldToday = netSold(today);
   const soldWeek = netSold(weekAgo);
   const tapsToday = log.filter((r) => r.action === "interest" && dayOf(r.ts) === today).length;
@@ -1069,8 +1092,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
 
   const perDay = new Map<string, { sold: number; taps: number }>();
-  log.forEach((r) => {
-    const { kind, sign } = countAction(r);
+  netLogRows(log).forEach(({ r, kind, sign }) => {
     const d = dayOf(r.ts);
     const e = perDay.get(d) || { sold: 0, taps: 0 };
     if (kind === "sold") e.sold += sign;
@@ -1085,8 +1107,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
 
   const soldByModel = new Map<string, number>();
   const tapsByModel = new Map<string, number>();
-  log.forEach((r) => {
-    const { kind, sign } = countAction(r);
+  netLogRows(log).forEach(({ r, kind, sign }) => {
     if (kind === "sold") soldByModel.set(r.model, (soldByModel.get(r.model) || 0) + sign);
     if (kind === "interest") tapsByModel.set(r.model, (tapsByModel.get(r.model) || 0) + 1);
   });
@@ -1096,8 +1117,7 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
     .slice(0, 12);
 
   const sizeDemand = new Map<number, number>();
-  log.forEach((r) => {
-    const { kind, sign } = countAction(r);
+  netLogRows(log).forEach(({ r, kind, sign }) => {
     const s = parseInt(r.size, 10);
     if (!(s >= 35 && s <= 45)) return;
     if (kind === "sold" || kind === "interest") sizeDemand.set(s, (sizeDemand.get(s) || 0) + sign);
@@ -1358,9 +1378,10 @@ export default function AdminPage() {
               }
         )
       );
-      toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`, {
-        action: { label: "Undo", onClick: () => adjust(p, size, -delta, true) },
-      });
+      // No Undo offered on an undo write — undo-of-undo can't be
+      // expressed in the log and would corrupt the net counts.
+      toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`,
+        undo ? undefined : { action: { label: "Undo", onClick: () => adjust(p, size, -delta, true) } });
     } catch {
       toast.error("Update failed");
     } finally {

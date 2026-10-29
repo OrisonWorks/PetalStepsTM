@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Review fixes for PR #24 (PR #25)
+
+- `netLogRows()` pairs each `undo` with the original write it reversed (same model+size, mirror-image `a→b` note) and drops BOTH — the sale is removed from the day it actually happened rather than netted off the undo's day. Unpaired undos keep the -1 fallback.
+- Undo writes no longer offer an "Undo" toast action (undo-of-undo can't be expressed in the log).
+- `logOk` now requires `logSupported === true` — a failed analytics fetch shows `—` KPIs, not zeros.
+
 ### 2026-10-29 — Review fixes for PR #23 (PR #24)
 
 - `countAction()` nets `undo` rows off the action they reversed (direction parsed from the `a→b` stock note: next>prev reversed a sale). Reports, dashboard KPIs, trend/top-model/size-demand charts all count net — an undone sale no longer counts as sold.
