@@ -1004,19 +1004,17 @@ function DashboardPanel({ products, analytics, go }: {
   go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list") => void;
 }) {
   const { data, loading, reload } = analytics;
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+  const [days, setDays] = useState(1);
+  const from = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10);
+  const rangeLabel = days === 1 ? "today" : `last ${days} days`;
   const log = data?.log || [];
   const receipts = data?.receipts || [];
   const logOk = data ? data.logSupported === true : false;
   const net = netLogRows(log);
-  const netSold = (minDay: string) =>
-    net.reduce((a, { r, kind, sign }) => (kind === "sold" && dayOf(r.ts) >= minDay ? a + sign : a), 0);
-  const soldToday = netSold(today);
-  const soldWeek = netSold(weekAgo);
-  const tapsToday = log.filter((r) => r.action === "interest" && dayOf(r.ts) === today).length;
-  const revToday = receipts
-    .filter((r) => dayOf(r.date || "") === today)
+  const soldR = net.reduce((a, { r, kind, sign }) => (kind === "sold" && dayOf(r.ts) >= from ? a + sign : a), 0);
+  const tapsR = log.filter((r) => r.action === "interest" && dayOf(r.ts) >= from).length;
+  const revR = receipts
+    .filter((r) => dayOf(r.date || "") >= from)
     .reduce((a, r) => a + (parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0), 0);
   const lowStock = products.filter((p) => totalPairs(p) > 0 && totalPairs(p) <= 5);
   // Dead stock only makes sense when the log read actually succeeded —
@@ -1028,11 +1026,19 @@ function DashboardPanel({ products, analytics, go }: {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">Show</span>
+        {[1, 7, 30].map((d) => (
+          <button key={d} onClick={() => setDays(d)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${days === d ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}>
+            {d === 1 ? "Today" : `${d} days`}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Pairs in stock" value={products.reduce((a, p) => a + totalPairs(p), 0)} hint={`${products.length} styles`} />
-        <Kpi label="Pairs sold today" value={logOk ? soldToday : "—"} hint={logOk ? `${soldWeek} in last 7 days` : "log read failed"} />
-        <Kpi label="Order taps today" value={logOk ? tapsToday : "—"} hint={logOk ? "WhatsApp orders opened" : "log read failed"} />
-        <Kpi label="Revenue today" value={`K${revToday}`} hint={data && !data.receiptsSupported ? "redeploy writer for receipts" : undefined} />
+        <Kpi label={`Pairs sold — ${rangeLabel}`} value={logOk ? soldR : "—"} hint={logOk ? undefined : "log read failed"} />
+        <Kpi label={`Order taps — ${rangeLabel}`} value={logOk ? tapsR : "—"} hint={logOk ? "WhatsApp orders opened" : "log read failed"} />
+        <Kpi label={`Revenue — ${rangeLabel}`} value={`K${revR}`} hint={data && !data.receiptsSupported ? "redeploy writer for receipts" : undefined} />
       </div>
       {data && !data.receiptsSupported && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -1413,6 +1419,7 @@ type Lead = { model: string; size: string; taps: number; lastTs: string };
 function LeadsPanel({ products }: { products: Product[] }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [show, setShow] = useState<"all" | "stocked" | "restock">("all");
 
   const load = async () => {
     setState("loading");
@@ -1441,24 +1448,35 @@ function LeadsPanel({ products }: { products: Product[] }) {
     return p ? (p.stock[s] || 0) > 0 : false;
   };
 
+  const shown = leads.filter((l) => (show === "all" ? true : show === "stocked" ? stocked(l) : !stocked(l)));
+
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold text-stone-800">Order taps without a sale</h2>
         {state === "ready" && (
           <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
-            {leads.length} open {leads.length === 1 ? "lead" : "leads"}
+            {shown.length} open {shown.length === 1 ? "lead" : "leads"}
           </span>
         )}
+        {(["all", "stocked", "restock"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setShow(f)}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${show === f ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}
+          >
+            {f === "all" ? "All" : f === "stocked" ? "In stock" : "Needs restock"}
+          </button>
+        ))}
         <button
           onClick={() =>
             downloadCsv(
               "leads.csv",
               ["model", "size", "taps", "last tap"],
-              leads.map((l) => [l.model, l.size, l.taps, l.lastTs])
+              shown.map((l) => [l.model, l.size, l.taps, l.lastTs])
             )
           }
-          disabled={!leads.length}
+          disabled={!shown.length}
           className="ml-auto rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200 disabled:opacity-40"
         >
           Export CSV
@@ -1474,8 +1492,8 @@ function LeadsPanel({ products }: { products: Product[] }) {
           Couldn&apos;t load leads — the writer needs the latest stock_writer.gs (kind=leads).
           <button onClick={load} className="ml-2 font-semibold underline">Retry</button>
         </div>
-      ) : leads.length === 0 ? (
-        <p className="mt-4 text-sm text-stone-400">No open leads — every order tap so far became a sale.</p>
+      ) : shown.length === 0 ? (
+        <p className="mt-4 text-sm text-stone-400">{leads.length === 0 ? "No open leads — every order tap so far became a sale." : "No leads in this filter."}</p>
       ) : (
         <table className="mt-3 w-full text-sm">
           <thead>
@@ -1485,7 +1503,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
             </tr>
           </thead>
           <tbody>
-            {leads.map((l) => {
+            {shown.map((l) => {
               const p = productOf(l.model);
               const has = stocked(l);
               return (
@@ -1654,6 +1672,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "matte" | "glossy" | "statement" | "red-bottom">("all");
   const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads">("dashboard");
   const analytics = useAnalytics();
 
@@ -1835,7 +1854,32 @@ export default function AdminPage() {
         </p>
       )}
       {view === "stock" && <div className="mt-6 space-y-3">
-        {products.map((p) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            ["all", `All (${products.length})`],
+            ["low", "Low stock"],
+            ["out", "Sold out"],
+            ["matte", "Matte"],
+            ["glossy", "Glossy"],
+            ["statement", "Statement"],
+            ["red-bottom", "Red Bottom"],
+          ] as const).map(([f, label]) => (
+            <button
+              key={f}
+              onClick={() => setStockFilter(f)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${stockFilter === f ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {products.filter((p) => {
+          const tp = totalPairs(p);
+          if (stockFilter === "low") return tp > 0 && tp <= 5;
+          if (stockFilter === "out") return tp === 0;
+          if (stockFilter === "all") return true;
+          return p.cat === stockFilter;
+        }).map((p) => (
           <section key={p.sku} className="rounded-2xl border border-rose-100 bg-white p-4">
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Admin filters + WhatsApp bubble bottom-left (PR #31)
+
+- **Dashboard range filter** — Today / 7 days / 30 days chips re-scope the sold, order-taps and revenue KPIs (stock KPI stays live).
+- **Stock tab filters** — chips: All / Low stock / Sold out / per-category (Matte, Glossy, Statement, Red Bottom).
+- **Leads filters** — All / In stock / Needs restock; the open-leads count and CSV export follow the filter.
+- **WhatsApp FAB moved to bottom-left** (real WhatsApp glyph, `bottom-20 left-4`, `md:bottom-8 md:left-5`) — mirrors the chatbot bubble on the bottom-right; MobileOrderBar still sits at bottom-3 on mobile.
+
 ### 2026-10-29 — Hide exact stock counts on the storefront (PR #30)
 
 - Client-side never shows exact pair counts for privacy: card badge reads "Only a few left" (≤5), card footer "In stock · SKU", shop header drops the pair total, hero swaps "Pairs available" for a "WhatsApp ordering" stat, quick-view size cells show "in stock"/"few left" (≤3), chatbot says "in stock"/"only a few left" instead of quoting numbers, promo video ("12 pairs"/"247 pairs") and the mauve-heel description ("Only 3 pairs") reworded the same way. Exact counts remain in the JSON payload (needed for in-stock detection) and fully visible in /admin.
