@@ -1112,7 +1112,7 @@ function Bar({ label, value, max, color = "bg-rose-400" }: { label: string; valu
   );
 }
 
-function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalytics> }) {
+function AnalyticsPanel({ analytics, products }: { analytics: ReturnType<typeof useAnalytics>; products: Product[] }) {
   const { data, loading, reload } = analytics;
   const [range, setRange] = useState(14);
   if (loading || !data) {
@@ -1131,19 +1131,32 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
   const receipts = data.receipts.filter((r) => dayOf(r.date || "") >= from);
   const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
 
-  const perDay = new Map<string, { sold: number; taps: number }>();
+  const perDay = new Map<string, { sold: number; taps: number; rev: number }>();
   net.forEach(({ r, kind, sign }) => {
     const d = dayOf(r.ts);
-    const e = perDay.get(d) || { sold: 0, taps: 0 };
+    const e = perDay.get(d) || { sold: 0, taps: 0, rev: 0 };
     if (kind === "sold") e.sold += sign;
     if (kind === "interest") e.taps += 1;
     perDay.set(d, e);
   });
+  receipts.forEach((r) => {
+    const d = dayOf(r.date || "");
+    const e = perDay.get(d) || { sold: 0, taps: 0, rev: 0 };
+    e.rev += parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0;
+    perDay.set(d, e);
+  });
   const days = Array.from({ length: range }, (_, i) => {
     const d = new Date(Date.now() - (range - 1 - i) * 864e5).toISOString().slice(0, 10);
-    return { d, ...(perDay.get(d) || { sold: 0, taps: 0 }) };
+    return { d, ...(perDay.get(d) || { sold: 0, taps: 0, rev: 0 }) };
   });
   const maxDay = Math.max(1, ...days.map((x) => Math.max(x.sold, x.taps)));
+  const maxRev = Math.max(1, ...days.map((x) => x.rev));
+  const totalRev = days.reduce((a, x) => a + x.rev, 0);
+
+  // Funnel: order taps → logged sales → paid receipts (conversion rates).
+  const tapsTotal = net.reduce((a, { kind }) => a + (kind === "interest" ? 1 : 0), 0);
+  const soldTotal = net.reduce((a, { kind, sign }) => a + (kind === "sold" ? sign : 0), 0);
+  const paidTotal = receipts.length;
 
   const soldByModel = new Map<string, number>();
   const tapsByModel = new Map<string, number>();
@@ -1155,6 +1168,15 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
     .map((m) => ({ m, sold: soldByModel.get(m) || 0, taps: tapsByModel.get(m) || 0 }))
     .sort((a, b) => b.sold - a.sold || b.taps - a.taps)
     .slice(0, 12);
+
+  // Sell-through per style: sold in range ÷ (sold + stock on hand now).
+  const stockBySku = new Map(products.map((p) => [p.sku, totalPairs(p)]));
+  const sellThrough = Array.from(soldByModel.entries())
+    .map(([m, sold]) => ({ m, sold, pct: Math.round((sold / Math.max(1, sold + (stockBySku.get(m) || 0))) * 100) }))
+    .filter((x) => x.sold > 0)
+    .sort((a, b) => b.pct - a.pct || b.sold - a.sold)
+    .slice(0, 12);
+  const maxSell = Math.max(1, ...sellThrough.map((x) => x.pct));
 
   const sizeDemand = new Map<number, number>();
   net.forEach(({ r, kind, sign }) => {
@@ -1233,22 +1255,54 @@ function AnalyticsPanel({ analytics }: { analytics: ReturnType<typeof useAnalyti
       )}
       <div className="rounded-2xl border border-rose-100 bg-white p-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-stone-800">Sales trend — sold vs order taps per day</h3>
-          <button onClick={() => downloadCsv(`petal-daily-${range}d.csv`, ["date", "sold", "order taps"], days.map((x) => [x.d, x.sold, x.taps]))} className="text-xs font-semibold text-rose-500">Export CSV</button>
+          <h3 className="font-semibold text-stone-800">Sales trend — sold vs order taps per day {totalRev > 0 && <span className="font-normal text-stone-400">· K{totalRev.toLocaleString()} revenue</span>}</h3>
+          <button onClick={() => downloadCsv(`petal-daily-${range}d.csv`, ["date", "sold", "order taps", "revenue K"], days.map((x) => [x.d, x.sold, x.taps, x.rev]))} className="text-xs font-semibold text-rose-500">Export CSV</button>
         </div>
         <div className="mt-3 space-y-1">
           {days.map((x) => (
             <div key={x.d} className="flex items-center gap-2 text-xs">
               <span className="w-16 shrink-0 text-stone-400">{x.d.slice(5)}</span>
               <div className="flex h-4 flex-1 gap-0.5">
-                <div className="rounded bg-rose-400" style={{ width: `${(x.sold / maxDay) * 50}%` }} title={`${x.sold} sold`} />
-                <div className="rounded bg-stone-300" style={{ width: `${(x.taps / maxDay) * 50}%` }} title={`${x.taps} taps`} />
+                <div className="rounded bg-rose-400" style={{ width: `${(x.sold / maxDay) * 40}%` }} title={`${x.sold} sold`} />
+                <div className="rounded bg-stone-300" style={{ width: `${(x.taps / maxDay) * 40}%` }} title={`${x.taps} taps`} />
+                <div className="rounded bg-emerald-400" style={{ width: `${(x.rev / maxRev) * 20}%` }} title={`K${x.rev} revenue`} />
               </div>
-              <span className="w-16 shrink-0 text-right text-stone-500">{x.sold} / {x.taps}</span>
+              <span className="w-24 shrink-0 text-right text-stone-500">{x.sold} / {x.taps}{x.rev ? ` · K${x.rev}` : ""}</span>
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-stone-400"><span className="inline-block h-2 w-2 rounded bg-rose-400" /> sold · <span className="inline-block h-2 w-2 rounded bg-stone-300" /> order taps (sold / taps)</p>
+        <p className="mt-2 text-xs text-stone-400"><span className="inline-block h-2 w-2 rounded bg-rose-400" /> sold · <span className="inline-block h-2 w-2 rounded bg-stone-300" /> order taps · <span className="inline-block h-2 w-2 rounded bg-emerald-400" /> revenue (own scale)</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <h3 className="font-semibold text-stone-800">Demand funnel — taps → sales → paid</h3>
+          <div className="mt-3 space-y-2">
+            {[
+              { label: "Order taps", n: tapsTotal, pct: 100 },
+              { label: "Sales logged", n: soldTotal, pct: tapsTotal ? Math.round((soldTotal / tapsTotal) * 100) : 0 },
+              { label: "Paid receipts", n: paidTotal, pct: soldTotal ? Math.round((paidTotal / soldTotal) * 100) : 0 },
+            ].map((s) => (
+              <div key={s.label} className="flex items-center gap-3 text-sm">
+                <span className="w-28 shrink-0 text-stone-500">{s.label}</span>
+                <div className="h-5 flex-1 rounded bg-stone-100">
+                  <div className="h-5 rounded bg-rose-400" style={{ width: `${Math.min(100, s.pct)}%` }} />
+                </div>
+                <span className="w-16 shrink-0 text-right font-semibold text-stone-700">{s.n} <span className="font-normal text-stone-400">{s.pct}%</span></span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-stone-400">Each stage as % of the one before — the gap between taps and sales is unserved demand (see leads).</p>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-white p-4">
+          <h3 className="font-semibold text-stone-800">Sell-through — % of stock sold</h3>
+          <div className="mt-3 space-y-1">
+            {sellThrough.map((x) => (
+              <Bar key={x.m} label={x.m} value={x.pct} max={maxSell} color="bg-emerald-400" />
+            ))}
+            {!sellThrough.length && <p className="text-sm text-stone-400">No sales in range</p>}
+          </div>
+          <p className="mt-2 text-xs text-stone-400">sold ÷ (sold + stock on hand) in range — high % styles are selling out.</p>
+        </div>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
@@ -1738,7 +1792,7 @@ export default function AdminPage() {
         <div className="mt-6"><DashboardPanel products={products} analytics={analytics} go={setView} /></div>
       )}
       {view === "analytics" && (
-        <div className="mt-6"><AnalyticsPanel analytics={analytics} /></div>
+        <div className="mt-6"><AnalyticsPanel analytics={analytics} products={products} /></div>
       )}
       {view === "add" && (
         <div className="mt-6">

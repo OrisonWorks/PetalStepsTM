@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Analytics: revenue trend, funnel, sell-through (PR #29)
+
+- **Revenue trend** — daily receipt totals now draw a third (emerald, own-scale) bar in the sales-trend card with a K-total in the header and a "revenue K" column in the CSV export.
+- **Demand funnel** — order taps → sales logged → paid receipts with stage-to-stage conversion %; the taps→sales gap is unserved demand (leads tab).
+- **Sell-through** — per-style sold ÷ (sold + stock on hand) %, top 12; needs the `products` prop (now passed into AnalyticsPanel). High % = selling out.
+
 ### 2026-10-29 — Newsletter, leads, one-click triggers (PR #27)
 
 - **Newsletter** — new `newsletter` admin tab: subject + message, pick up to 4 in-stock styles to feature, branded HTML template (logo, product cards, shop CTA) with live iframe preview. Sends to every SUBSCRIBERS row via writer `sendNewsletter` (MailApp); Gmail's ~100/day quota caps the batch and the UI reports sent/failed/remaining.
