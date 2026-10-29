@@ -15,7 +15,7 @@ const inputCls =
 
 type LogRow = { ts: string; action: string; model: string; size: string; note: string };
 
-type Subscriber = { ts: string; email: string };
+type Subscriber = { ts: string; email: string; status?: string };
 
 type ReceiptRow = {
   no: string; date: string; client: string; phone: string; items: string;
@@ -140,14 +140,30 @@ function SubscribersPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
+  const active = subs.filter((s) => !s.status);
   const copyAll = async () => {
     try {
-      await navigator.clipboard.writeText(subs.map((s) => s.email).join(", "));
+      await navigator.clipboard.writeText(active.map((s) => s.email).join(", "));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Copy failed — select the emails manually");
     }
+  };
+
+  const optOut = async (email: string) => {
+    const res = await fetch("/api/admin/unsubscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      toast.error(data.error || "Couldn't mark opt-out");
+      return;
+    }
+    setSubs((list) => list.map((s) => (s.email === email ? { ...s, status: "stop" } : s)));
+    toast.success(`${email} opted out`);
   };
 
   return (
@@ -156,7 +172,7 @@ function SubscribersPanel() {
         <h2 className="font-semibold text-stone-800">Petal List subscribers</h2>
         {!loading && !failed && (
           <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
-            {subs.length} {subs.length === 1 ? "subscriber" : "subscribers"}
+            {active.length} active{subs.length - active.length ? ` · ${subs.length - active.length} opted out` : ""}
           </span>
         )}
         {subs.length > 0 && (
@@ -190,9 +206,25 @@ function SubscribersPanel() {
           <tbody>
             {[...subs].reverse().map((s, i) => (
               <tr key={`${s.email}-${i}`} className="border-t border-rose-50">
-                <td className="py-2 font-semibold text-stone-700">{s.email}</td>
+                <td className="py-2 font-semibold text-stone-700">
+                  {s.email}
+                  {s.status && (
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-500">
+                      opted out
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 text-right text-stone-500">
                   {String(s.ts).slice(0, 16).replace("T", " ")}
+                  {!s.status && (
+                    <button
+                      onClick={() => optOut(s.email)}
+                      title="Mark opted out (reply-STOP)"
+                      className="ml-3 rounded-lg bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-500 hover:bg-rose-100 hover:text-rose-600"
+                    >
+                      stop
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -200,8 +232,9 @@ function SubscribersPanel() {
         </table>
       )}
       <p className="mt-4 text-xs text-stone-400">
-        Stored on the SUBSCRIBERS tab of your stock sheet — “Copy all emails” gives a comma-separated
-        list for a BCC email or broadcast tool.
+        Stored on the SUBSCRIBERS tab of your stock sheet — “Copy all emails” gives the active
+        addresses for a BCC email or broadcast tool. Reply-STOP requests: hit “stop” on their row
+        and newsletters skip them.
       </p>
     </div>
   );
@@ -1424,6 +1457,12 @@ function NewsletterPanel({ products }: { products: Product[] }) {
 
   const site = typeof window === "undefined" ? "" : window.location.origin;
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Attribute values also need quotes escaped — a crafted product URL could
+  // otherwise break out of src="…" into new attributes.
+  const escAttr = (s: string) => escHtml(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  // Sheet photos can be relative (/products/…) or absolute — don't prefix
+  // absolute URLs with the site origin.
+  const abs = (u: string) => (/^https?:\/\//i.test(u) ? u : site + u);
   const paragraphs = message.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   const html = `<!doctype html><html><body style="margin:0;background:#fff7f8;font-family:Georgia,serif;color:#44403c">
 <div style="max-width:560px;margin:0 auto;padding:24px">
@@ -1434,7 +1473,7 @@ function NewsletterPanel({ products }: { products: Product[] }) {
   <div style="background:#ffffff;border:1px solid #ffe4e6;border-radius:16px;padding:20px;margin-top:16px">
     ${subject ? `<h2 style="margin:0 0 12px;font-size:18px;color:#1c1917">${escHtml(subject)}</h2>` : ""}
     ${paragraphs.map((p) => `<p style="font-size:14px;line-height:1.6;margin:0 0 10px">${escHtml(p).replace(/\n/g, "<br/>")}</p>`).join("")}
-    ${featured.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>${featured.map((p) => `<td align="center" style="padding:4px"><img src="${site}${p.img}" alt="${escHtml(p.name)}" width="120" style="border-radius:12px;display:block"/><div style="font-size:12px;margin-top:6px">${escHtml(p.name)}</div><div style="font-size:12px;font-weight:bold;color:#f43f5e">K${p.price}</div></td>`).join("")}</tr></table>` : ""}
+    ${featured.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>${featured.map((p) => `<td align="center" style="padding:4px"><img src="${escAttr(abs(p.img))}" alt="${escAttr(p.name)}" width="120" style="border-radius:12px;display:block"/><div style="font-size:12px;margin-top:6px">${escHtml(p.name)}</div><div style="font-size:12px;font-weight:bold;color:#f43f5e">K${p.price}</div></td>`).join("")}</tr></table>` : ""}
     <p style="text-align:center;margin:20px 0 0"><a href="${site}" style="background:#f43f5e;color:#fff;padding:10px 24px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:bold">Shop the collection</a></p>
   </div>
   <p style="text-align:center;font-size:11px;color:#a8a29e;margin-top:16px">
@@ -1532,7 +1571,7 @@ function NewsletterPanel({ products }: { products: Product[] }) {
       </div>
       <div className="rounded-2xl border border-rose-100 bg-white p-4">
         <h3 className="text-sm font-semibold text-stone-600">Preview</h3>
-        <iframe title="Newsletter preview" srcDoc={html} className="mt-2 h-[480px] w-full rounded-xl border border-stone-100" />
+        <iframe title="Newsletter preview" sandbox="" srcDoc={html} className="mt-2 h-[480px] w-full rounded-xl border border-stone-100" />
       </div>
     </div>
   );

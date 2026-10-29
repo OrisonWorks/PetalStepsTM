@@ -28,7 +28,11 @@
  *   - Appends to the SUBSCRIBERS tab (TS, EMAIL), deduped — the newsletter.
  * POST JSON body: { token, action: "sendNewsletter", subject, html, text? }
  *   - Sends the newsletter to every SUBSCRIBERS address until the daily
- *     Gmail quota runs out; returns {sent, failed, remaining}.
+ *     Gmail quota runs out; returns {sent, failed, remaining}. Rows whose
+ *     STATUS column is marked (e.g. "stop") are skipped; a LAST_BATCH
+ *     marker stops a quota-interrupted rerun resending the same subject.
+ * POST JSON body: { token, action: "unsubscribe", email }
+ *   - Marks the SUBSCRIBERS row STATUS=stop so future sends skip it.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
  * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
  * GET /exec?token=…&kind=receipts — all receipt rows (keys stripped).
@@ -74,6 +78,8 @@ function doPost(e) {
       return sendReceiptEmail(body, out);
     if (body.action === "sendNewsletter")
       return sendNewsletter(body, out);
+    if (body.action === "unsubscribe")
+      return unsubscribeEmail(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -432,14 +438,78 @@ function subscribeEmail(body, out) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = getOrCreate_(ss, "SUBSCRIBERS", ["TS", "EMAIL"]);
-    const exists = sheetRows_(ss, "SUBSCRIBERS").some(
-      (r) => String(r.email || "").trim().toLowerCase() === email
-    );
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map((h) => String(h).trim().toLowerCase());
+    const emailCol = headers.indexOf("email");
+    const statusCol = headers.indexOf("status");
+    let exists = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).trim().toLowerCase() === email) {
+        exists = true;
+        // A resubscribe after opting out clears the stop marker.
+        if (statusCol >= 0 && String(data[i][statusCol]).trim()) {
+          sheet.getRange(i + 1, statusCol + 1).setValue("");
+          sheet.getRange(i + 1, 1).setValue(new Date());
+          SpreadsheetApp.flush();
+        }
+        break;
+      }
+    }
     if (!exists) {
       sheet.appendRow([new Date(), safe_(email)]);
       SpreadsheetApp.flush();
     }
     return out({ ok: true, email, already: exists });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// POST { action: "unsubscribe", email } → marks STATUS=stop on the
+// SUBSCRIBERS row (a suppression, not a deletion — the address stays for
+// dedupe, and resubscribing clears the marker).
+function unsubscribeEmail(body, out) {
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
+    return out({ ok: false, error: "invalid email" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreate_(ss, "SUBSCRIBERS", ["TS", "EMAIL"]);
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map((h) => String(h).trim().toLowerCase());
+    const colOf = (name) => {
+      let col = header.lastIndexOf(name);
+      if (col < 0) {
+        col = header.length;
+        header.push(name);
+        sheet.getRange(1, col + 1).setValue(name.toUpperCase());
+      }
+      return col;
+    };
+    const emailCol = header.indexOf("email");
+    const statusCol = colOf("status");
+    const data = sheet.getDataRange().getValues();
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).trim().toLowerCase() === email) {
+        sheet.getRange(i + 1, statusCol + 1).setValue("stop");
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      // Row to mark stop on even when the address isn't on file — a
+      // later re-add via subscribe clears it.
+      const row = new Array(statusCol + 1).fill("");
+      row[0] = new Date();
+      row[emailCol] = safe_(email);
+      row[statusCol] = "stop";
+      sheet.appendRow(row);
+    }
+    SpreadsheetApp.flush();
+    return out({ ok: true, email });
   } finally {
     lock.releaseLock();
   }
@@ -537,7 +607,10 @@ function sendReceiptEmail(body, out) {
 // POST { action: "sendNewsletter", subject, html, text? }
 // Sends to every SUBSCRIBERS row. Free Gmail sends ~100 recipients/day —
 // MailApp.getRemainingDailyQuota() gates the loop so a big list degrades
-// to a partial send the caller can rerun tomorrow, not an error.
+// to a partial send the caller can rerun tomorrow, not an error. Rows
+// with a STATUS value (e.g. "stop") are skipped; each send stamps
+// LAST_BATCH with the subject so a quota-interrupted rerun continues
+// where it stopped instead of duplicating the first batch.
 function sendNewsletter(body, out) {
   const subject = safe_(String(body.subject || "").trim()).slice(0, 200);
   const html = String(body.html || "").slice(0, 60000);
@@ -548,27 +621,49 @@ function sendNewsletter(body, out) {
   if (!lock.tryLock(60000)) return out({ ok: false, error: "busy" });
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const emails = sheetRows_(ss, "SUBSCRIBERS")
-      .map((r) => String(r.email || "").trim())
-      .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+    const sheet = getOrCreate_(ss, "SUBSCRIBERS", ["TS", "EMAIL"]);
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map((h) => String(h).trim().toLowerCase());
+    const colOf = (name) => {
+      let col = header.lastIndexOf(name);
+      if (col < 0) {
+        col = header.length;
+        header.push(name);
+        sheet.getRange(1, col + 1).setValue(name.toUpperCase());
+      }
+      return col;
+    };
+    const emailCol = header.indexOf("email");
+    const statusCol = colOf("status");
+    const batchCol = colOf("last_batch");
+    const batchKey = subject.toLowerCase();
+    const data = sheet.getDataRange().getValues();
+    let eligible = 0;
     let sent = 0;
     let failed = 0;
-    for (const email of emails) {
-      if (MailApp.getRemainingDailyQuota() <= 0) break;
+    for (let i = 1; i < data.length; i++) {
+      const email = String(data[i][emailCol] || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) continue;
+      if (String(data[i][statusCol] || "").trim()) continue; // opted out
+      if (String(data[i][batchCol] || "").trim() === batchKey) continue; // got this send
+      eligible++;
+      if (MailApp.getRemainingDailyQuota() <= 0) continue;
       try {
         const plain = text || "View this email in a browser-capable client — Petal Steps.";
         MailApp.sendEmail(email, subject, plain, html ? { htmlBody: html } : {});
+        sheet.getRange(i + 1, batchCol + 1).setValue(batchKey);
         sent++;
       } catch (err) {
         failed++;
       }
     }
-    const remaining = emails.length - sent - failed;
+    const remaining = eligible - sent - failed;
+    SpreadsheetApp.flush();
     appendLog_("newsletter", "-", "",
       subject.slice(0, 80) + " · " + sent + " sent" +
       (failed ? " · " + failed + " failed" : "") +
       (remaining ? " · " + remaining + " left (quota)" : ""));
-    return out({ ok: true, total: emails.length, sent, failed, remaining });
+    return out({ ok: true, total: eligible, sent, failed, remaining });
   } finally {
     lock.releaseLock();
   }
@@ -615,6 +710,7 @@ function doGet(e) {
       const rows = sheetRows_(ss, "SUBSCRIBERS").map((r) => ({
         ts: r.ts,
         email: r.email,
+        status: r.status || "",
       }));
       return out({ ok: true, subscribers: rows });
     }
@@ -632,15 +728,36 @@ function doGet(e) {
       // Order taps (interest) never followed by a sale of the same
       // model+size — unfilled demand worth a follow-up or a restock.
       const rows = sheetRows_(ss, "LOG");
+      // Pair each undo with the write it reversed (same model+size,
+      // mirror a→b note) and drop both — an undone sale must not keep
+      // hiding the taps it once filled. Same pairing as the admin UI.
+      const dead = new Array(rows.length).fill(false);
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const u = rows[i];
+        if (u.action !== "undo") continue;
+        const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
+        if (m.length !== 2 || m.some((x) => isNaN(x))) continue;
+        const kind = m[1] > m[0] ? "sold" : "restock";
+        const mirror = m[1] + "→" + m[0];
+        for (let j = i - 1; j >= 0; j--) {
+          const o = rows[j];
+          if (dead[j] || o.action !== kind) continue;
+          if (o.model === u.model && String(o.size) === String(u.size) && String(o.note) === mirror) {
+            dead[j] = true;
+            dead[i] = true;
+            break;
+          }
+        }
+      }
       const lastSold = {};
-      rows.forEach((r) => {
+      rows.forEach((r, i) => {
         const key = r.model + "|" + r.size;
-        if (r.action === "sold" && (!lastSold[key] || String(r.ts) > String(lastSold[key])))
+        if (!dead[i] && r.action === "sold" && (!lastSold[key] || String(r.ts) > String(lastSold[key])))
           lastSold[key] = r.ts;
       });
       const leads = {};
-      rows.forEach((r) => {
-        if (r.action !== "interest") return;
+      rows.forEach((r, i) => {
+        if (dead[i] || r.action !== "interest") return;
         const key = r.model + "|" + r.size;
         // A sale AFTER the tap counts it as filled — a tap newer than
         // the last sale is still open demand.
