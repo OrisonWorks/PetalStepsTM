@@ -20,7 +20,7 @@ const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
   { filter: "red-bottom", label: "Red Bottom", sub: "Signature red sole · K650", img: "/products/image25.jpg" },
 ];
 
-export function Hero({ styles = 29, pairs = 247 }: { styles?: number; pairs?: number }) {
+export function Hero({ styles = 29 }: { styles?: number }) {
   return (
     <section id="top" className="bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
       <div className="mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
@@ -33,7 +33,7 @@ export function Hero({ styles = 29, pairs = 247 }: { styles?: number; pairs?: nu
             <Button size="lg" variant="outline" asChild><a href={waLink("Hi Petal Steps by Thandiwe Mwaba! I'd like to check heel availability.")} target="_blank" rel="noreferrer">WhatsApp {WA_DISPLAY}</a></Button>
           </div>
           <div className="mt-9 flex gap-8">
-            {[[String(styles), "Styles in stock"], [String(pairs), "Pairs available"], ["EU 35–45", "Sizes"]].map(([n, l]) => (
+            {[[String(styles), "Styles in stock"], ["WhatsApp", "Easy ordering"], ["EU 35–45", "Sizes"]].map(([n, l]) => (
               <div key={l}><strong className="font-display block text-2xl">{n}</strong><span className="text-xs text-stone-500">{l}</span></div>
             ))}
           </div>
@@ -84,7 +84,7 @@ export function SaleBanner({ onSelect }: { onSelect: (f: Filter) => void }) {
         <div>
           <Badge className="mb-3 bg-white/20 text-white">Grand opening · 24 October 2026 · 09:00–13:00</Badge>
           <h2 className="font-display text-4xl font-semibold">Come celebrate with us in Thompson Park</h2>
-          <p className="mt-1 text-rose-50">{SHOP_ADDRESS}. Almost-gone styles have 5 pairs or fewer — grab your EU size before it sells out.</p>
+          <p className="mt-1 text-rose-50">{SHOP_ADDRESS}. Almost-gone styles are marked — grab your EU size before it sells out.</p>
         </div>
         <Button variant="light" size="lg" onClick={() => onSelect("low")}>Shop almost-gone heels</Button>
       </div>
@@ -93,7 +93,7 @@ export function SaleBanner({ onSelect }: { onSelect: (f: Filter) => void }) {
 }
 
 const WHY = [
-  { icon: BadgeCheck, title: "Real stock, real sizes", text: "Every style shows the EU sizes actually in stock and how many pairs are left. No guessing." },
+  { icon: BadgeCheck, title: "Real stock, real sizes", text: "Every style shows the EU sizes actually in stock, updated live from our sheet. No guessing." },
   { icon: PiggyBank, title: "Honest Kwacha prices", text: "All heels K450–K650. Kitten heels to signature red bottoms — the price is on the pair." },
   { icon: Truck, title: "Lusaka & out-of-town delivery", text: "Lusaka: you book Yango for collection. Out of town: Platinum & Falcon courier or bus courier, cost confirmed after weighing." },
   { icon: ShieldCheck, title: "Order safely", text: "Only order and pay via our official number +260 760 732 751. Confirm availability before payment and attach proof of payment." },

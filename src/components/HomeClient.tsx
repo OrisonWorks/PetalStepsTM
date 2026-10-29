@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
 import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Marquee, MobileOrderBar, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
 import { Shop } from "@/components/Shop";
-import { totalPairs, type Filter, type Product } from "@/lib/products";
+import { type Filter, type Product } from "@/lib/products";
 
 export function HomeClient({ products }: { products: Product[] }) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -14,7 +14,6 @@ export function HomeClient({ products }: { products: Product[] }) {
   const [sort, setSort] = useState("featured");
   const [quick, setQuick] = useState<Product | null>(null);
   const [size, setSize] = useState<number | null>(null);
-  const pairs = products.reduce((a, p) => a + totalPairs(p), 0);
 
   const goFilter = useCallback((f: Filter) => {
     setFilter(f);
@@ -25,7 +24,7 @@ export function HomeClient({ products }: { products: Product[] }) {
     <>
       <Header search={search} setSearch={setSearch} />
       <main>
-        <Hero styles={products.length} pairs={pairs} />
+        <Hero styles={products.length} />
         <Marquee />
         <Reviews />
         <Categories onSelect={goFilter} />

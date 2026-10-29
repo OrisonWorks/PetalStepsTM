@@ -61,7 +61,7 @@ function reply(raw: string, products: Product[], pendingSize?: number | null): O
 
   if (p && size)
     return (p.stock[size] || 0) > 0
-      ? { text: `${p.name} in EU ${size}: we have ${p.stock[size]} pair${p.stock[size] === 1 ? "" : "s"} (K${p.price}). Tap below to order on WhatsApp.`, link: { label: "Order on WhatsApp", href: WA_ORDER } }
+      ? { text: `${p.name} in EU ${size}: ${p.stock[size] <= 3 ? "only a few left" : "in stock"} (K${p.price}). Tap below to order on WhatsApp.`, link: { label: "Order on WhatsApp", href: WA_ORDER } }
       : { text: `${p.name} in EU ${size} is sold out. ${p.stock && Object.keys(p.stock).length ? "Other sizes still available — ask me!" : "Message us on WhatsApp for restock news."}`, link: { label: "Ask on WhatsApp", href: WA_QUESTION } };
   if (p && /price|cost|much|pay/.test(q))
     return { text: `${p.name} is K${p.price}. ${stockLine(p)}`, link: { label: "Order on WhatsApp", href: WA_ORDER } };

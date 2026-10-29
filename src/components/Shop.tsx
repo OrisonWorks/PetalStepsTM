@@ -23,7 +23,6 @@ export function Shop({ products, filter, setFilter, search, sort, setSort, onQui
   sort: string; setSort: (v: string) => void; onQuick: (p: Product) => void;
   size: number | null; setSize: (s: number | null) => void;
 }) {
-  const totalPairsAll = products.reduce((a, p) => a + totalPairs(p), 0);
   const list = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = products.filter((p) =>
@@ -42,7 +41,7 @@ export function Shop({ products, filter, setFilter, search, sort, setSort, onQui
       <div className="mx-auto mb-8 max-w-xl text-center">
         <Badge variant="soft" className="mb-3">The heels collection · Lusaka</Badge>
         <h2 className="font-display text-4xl font-semibold">Shop Petal Steps</h2>
-        <p className="mt-2 text-stone-500">{products.length} styles · {totalPairsAll} pairs · K450–K650. Tap a heel to see EU sizes in stock, then add it to your bag.</p>
+        <p className="mt-2 text-stone-500">{products.length} styles in stock · K450–K650. Tap a heel to see EU sizes in stock, then add it to your bag.</p>
       </div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
