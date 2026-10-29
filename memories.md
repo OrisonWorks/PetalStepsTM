@@ -18,6 +18,16 @@ Living record of what has been built and how the pieces fit together. **Update t
 - **ChatWidget** — floating helper bubble (above the mobile order bar; BackToTop shifted up on mobile to clear it). Rule-based replies cover: live stock/size/price lookups (fuzzy product match + EU size extraction), ordering steps, payment numbers, Lusaka Yango collection, couriers, 5-day hold, hours, location, WhatsApp, returns, greetings. Unmatched → WhatsApp deep link. Quick-reply chips seed the conversation. This is the pattern that later plugs into WhatsApp Cloud API.
 - Matcher details: exact SKU detected against the raw query (punctuated SKUs like `18085-33`/`9511-6/C` survive); scoring covers name + colour words ("Apricot" resolves via `color`); tied matches ask "which one?" instead of guessing; a size carries over as `pendingSize` so the clarify→answer turn still answers the original lookup.
 
+### 2026-10-29 — Newsletter, leads, one-click triggers (PR #27)
+
+- **Newsletter** — new `newsletter` admin tab: subject + message, pick up to 4 in-stock styles to feature, branded HTML template (logo, product cards, shop CTA) with live iframe preview. Sends to every SUBSCRIBERS row via writer `sendNewsletter` (MailApp); Gmail's ~100/day quota caps the batch and the UI reports sent/failed/remaining.
+- **Leads** — new `leads` tab: order taps (interest log rows) with no later sale of the same model+size, via `kind=leads`. Table flags "in stock — follow up" vs "sold out — restock", CSV export.
+- **installTriggers()** — run once in the Apps Script editor to create `dailyDigest` (daily ~21:00) + `backupSheet` (Sundays ~06:00); idempotent, replaces existing triggers.
+- New routes: `POST /api/admin/newsletter`, `GET /api/admin/leads`, `POST /api/admin/unsubscribe` (all admin-gated).
+- **Opt-outs** — SUBSCRIBERS gains STATUS/LAST_BATCH columns: "stop" rows are skipped by every send and shown "opted out" in the mailing-list tab (per-row stop button honors reply-STOP; resubscribing clears it). LAST_BATCH stamps a hash of the full subject+text+html per sent address, so quota-interrupted sends resume where they stopped yet a reused subject still reaches everyone; the preview iframe is sandboxed and photo URLs are attribute-escaped (absolute photo URLs supported).
+- `kind=leads` pairs undo↔original log rows (same pairing as the admin UI) so an undone sale stops hiding the taps it once filled.
+
+
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
 - AnalyticsPanel now nets the FULL log before cutting to the selected range — an undo inside the range pairs with its original outside it (both drop) instead of reading as a negative sale; dashboard and analytics totals agree.
