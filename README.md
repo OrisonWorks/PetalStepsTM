@@ -101,7 +101,7 @@ Two scheduled functions live in `stock_writer.gs`. Install them once:
 ## FAQs + mailing list
 
 - The homepage **FAQs** section answers ordering, payment and delivery questions in text, and the three policy card images open full-size on tap.
-- The **Petal List** subscribe form writes each email to a `SUBSCRIBERS` tab on the sheet via the writer's `subscribe` action (deduped). Requires the latest `stock_writer.gs` deployed (New version) — until then signups return an error.
+- The **Petal List** subscribe form writes each email to a `SUBSCRIBERS` tab on the sheet via the writer's `subscribe` action (deduped). The **mailing list** tab in `/admin` lists them (via `kind=subscribers`) with a one-click "copy all emails". Requires the latest `stock_writer.gs` deployed (New version) — until then signups and the admin tab return an error.
 
 ## Notes
 

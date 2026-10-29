@@ -28,6 +28,7 @@
  *   - Appends to the SUBSCRIBERS tab (TS, EMAIL), deduped — the newsletter.
  * GET /exec?token=…&kind=log&n=300 — last n LOG rows as JSON.
  * GET /exec?token=…&kind=receipt&no=PS-0001 — one receipt row as JSON.
+ * GET /exec?token=…&kind=subscribers — SUBSCRIBERS rows (TS, EMAIL) as JSON.
  *
  * Time-driven triggers (install once via the clock icon):
  *   dailyDigest()  — emails the day's sales/interest summary
@@ -522,7 +523,7 @@ function sendReceiptEmail(body, out) {
 
 // ---------- read endpoints ----------
 
-// GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001
+// GET /exec?token=…&kind=log&n=300 | kind=receipt&no=PS-0001 | kind=subscribers
 function doGet(e) {
   const out = (o) =>
     ContentService.createTextOutput(JSON.stringify(o)).setMimeType(
@@ -556,6 +557,13 @@ function doGet(e) {
       if (!row) return out({ ok: false, error: "not found" });
       delete row.key;
       return out({ ok: true, receipt: row });
+    }
+    if (kind === "subscribers") {
+      const rows = sheetRows_(ss, "SUBSCRIBERS").map((r) => ({
+        ts: r.ts,
+        email: r.email,
+      }));
+      return out({ ok: true, subscribers: rows });
     }
     return out({ ok: false, error: "unknown kind" });
   } catch (err) {
