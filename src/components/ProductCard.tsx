@@ -35,7 +35,7 @@ export function ProductCard({ product, onQuick }: { product: Product; onQuick: (
             </span>
           ))}
         </div>
-        <p className="text-xs text-stone-500">In stock · {product.sku}</p>
+        <p className="text-xs text-stone-500">In stock</p>
         <div className="mt-auto flex items-baseline gap-2 pt-2">
           <strong className="text-lg text-rose-600">{money(product.price)}</strong>
           <span className="text-xs text-stone-400">ZMW</span>

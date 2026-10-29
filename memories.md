@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Hide the style SKU on the storefront (PR #32)
+
+- Same privacy rule as stock counts: clients see name + photo, never the model code. Removed from product card footer ("In stock"), quick view ("ZMW"), and bag line items. SKU still rides inside the WhatsApp order message (the store needs it to identify the style), still matches chatbot queries and site search invisibly, and is fully visible in /admin.
+
 ### 2026-10-29 — Admin filters + WhatsApp bubble bottom-left (PR #31)
 
 - **Dashboard range filter** — Today / 7 days / 30 days chips re-scope the sold, order-taps and revenue KPIs (stock KPI stays live).

@@ -46,7 +46,7 @@ export function CartDrawer() {
               <Image src={i.img} alt={i.name} width={128} height={128} className="h-16 w-16 rounded-xl object-cover" />
               <div>
                 <h4 className="text-sm font-bold">{i.name}</h4>
-                <p className="text-xs text-stone-500">EU size {i.size} · {i.sku} · {money(i.price)}</p>
+                <p className="text-xs text-stone-500">EU size {i.size} · {money(i.price)}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <button className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-200" onClick={() => dec(i.key)}><Minus className="h-3 w-3" /></button>
                   <span className="text-sm font-bold">{i.qty}</span>
