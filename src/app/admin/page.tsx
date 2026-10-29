@@ -885,10 +885,12 @@ function EditForm({
   product,
   onSaved,
   onCancel,
+  onDirty,
 }: {
   product: Product;
   onSaved: (fields: Partial<Product>) => void;
   onCancel: () => void;
+  onDirty: (dirty: boolean) => void;
 }) {
   const { ask, dialog } = useConfirm();
   const [form, setForm] = useState({
@@ -952,13 +954,16 @@ function EditForm({
     }
   };
 
+  // Report dirtiness up so the parent's guarded exits (Close, Edit-other,
+  // tab switch) can confirm before unmounting us. Cleanup resets the flag.
   const dirty =
     form.name !== product.name || form.color !== product.color ||
     form.price !== String(product.price) || form.cat !== product.cat ||
     form.img !== product.img || form.desc !== product.desc;
-  const cancel = async () => {
-    if (!dirty || await ask({ title: "Discard your edits?", body: `Your changes to ${product.name} haven't been saved yet.`, confirmLabel: "Discard" })) onCancel();
-  };
+  useEffect(() => {
+    onDirty(dirty);
+    return () => onDirty(false);
+  }, [dirty, onDirty]);
 
   const input =
     "w-full rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300";
@@ -1001,7 +1006,7 @@ function EditForm({
         </button>
         <button
           type="button"
-          onClick={cancel}
+          onClick={onCancel}
           className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-300"
         >
           Cancel
@@ -1026,7 +1031,7 @@ function Kpi({ label, value, hint }: { label: string; value: string | number; hi
 function DashboardPanel({ products, analytics, go }: {
   products: Product[];
   analytics: ReturnType<typeof useAnalytics>;
-  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list") => void;
+  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list") => void | Promise<void>;
 }) {
   const { data, loading, reload } = analytics;
   const [days, setDays] = useState(1);
@@ -1706,6 +1711,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
+  const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "matte" | "glossy" | "statement" | "red-bottom">("all");
   const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads">("dashboard");
   const analytics = useAnalytics();
@@ -1743,6 +1749,22 @@ export default function AdminPage() {
       const d = await res.json().catch(() => ({}));
       toast.error(d.error || "Login failed");
     }
+  };
+
+  // Every path that can drop an open editor's unsaved state — Cancel, the
+  // row's Close button, opening another product, or switching tabs — funnels
+  // through here so the discard confirm fires exactly once.
+  const discardEdits = () =>
+    ask({ title: "Discard your edits?", body: "Your product changes haven't been saved yet.", confirmLabel: "Discard" });
+  const closeEditor = async (next = "") => {
+    if (editDirty && !(await discardEdits())) return false;
+    setEditing(next);
+    return true;
+  };
+  const goView = async (v: typeof view) => {
+    if (view === v) return;
+    if (!(await closeEditor(""))) return;
+    setView(v);
   };
 
   const logout = async () => {
@@ -1852,7 +1874,7 @@ export default function AdminPage() {
         {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads"] as const).map((v) => (
           <button
             key={v}
-            onClick={() => setView(v)}
+            onClick={() => goView(v)}
             className={`rounded-full px-4 py-1.5 text-sm font-semibold capitalize ${
               view === v ? "bg-rose-500 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
@@ -1862,7 +1884,7 @@ export default function AdminPage() {
         ))}
       </nav>
       {view === "dashboard" && (
-        <div className="mt-6"><DashboardPanel products={products} analytics={analytics} go={setView} /></div>
+        <div className="mt-6"><DashboardPanel products={products} analytics={analytics} go={goView} /></div>
       )}
       {view === "analytics" && (
         <div className="mt-6"><AnalyticsPanel analytics={analytics} products={products} stockLive={source === "sheet"} /></div>
@@ -1872,6 +1894,7 @@ export default function AdminPage() {
           <AddStylePanel
             onCreated={async () => {
               await loadProducts();
+              setEditing("");
               setView("stock");
             }}
           />
@@ -1879,6 +1902,7 @@ export default function AdminPage() {
             <BulkImport
               onDone={async () => {
                 await loadProducts();
+                setEditing("");
                 setView("stock");
               }}
             />
@@ -1938,7 +1962,7 @@ export default function AdminPage() {
                 </span>
               </div>
               <button
-                onClick={() => setEditing(editing === p.sku ? "" : p.sku)}
+                onClick={() => void closeEditor(editing === p.sku ? "" : p.sku)}
                 className="ml-auto rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
               >
                 {editing === p.sku ? "Close" : "Edit"}
@@ -1947,7 +1971,8 @@ export default function AdminPage() {
             {editing === p.sku && (
               <EditForm
                 product={p}
-                onCancel={() => setEditing("")}
+                onCancel={() => void closeEditor("")}
+                onDirty={setEditDirty}
                 onSaved={(fields) => {
                   setProducts((ps) =>
                     ps.map((q) => (q.sku === p.sku ? { ...q, ...fields } : q))
