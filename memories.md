@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Storefront chat widget (PR #28)
+
+- **ChatWidget** — floating helper bubble (above the mobile order bar; BackToTop shifted up on mobile to clear it). Rule-based replies cover: live stock/size/price lookups (fuzzy product match + EU size extraction), ordering steps, payment numbers, Lusaka Yango collection, couriers, 5-day hold, hours, location, WhatsApp, returns, greetings. Unmatched → WhatsApp deep link. Quick-reply chips seed the conversation. This is the pattern that later plugs into WhatsApp Cloud API.
+
 ### 2026-10-29 — Review fixes for PR #25 (PR #26)
 
 - AnalyticsPanel now nets the FULL log before cutting to the selected range — an undo inside the range pairs with its original outside it (both drop) instead of reading as a negative sale; dashboard and analytics totals agree.
