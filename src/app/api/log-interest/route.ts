@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "unknown model" }, { status: 400 });
   }
   const size = Number(body.size);
-  const note = typeof body.note === "string" ? body.note.slice(0, 200) : "";
+  const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
   try {
     const res = await fetch(url, {
       method: "POST",

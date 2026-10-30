@@ -13,6 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Lead contacts + consent banner (PR TBD)
+
+- **Consent banner** (`src/components/ConsentBanner.tsx`) — one-time banner until Accept/Decline, stored in localStorage `ps-consent`. Covers saving checkout name/number for order follow-up (the site has no tracking cookies); "No thanks" keeps taps anonymous and ordering still works.
+- **Contact in interest taps** — when consent is given, CartDrawer appends `· for NAME · tel PHONE` to the log note (before `· in AREA` so analytics parsing still works); `kind=leads` returns `who`/`phone` from the newest tap; the admin Leads table shows the contact as a wa.me follow-up link with a pre-filled message, and leads CSV gains name/phone columns. `/api/log-interest` note cap raised to 300 chars. stock_writer.gs needs a new-version redeploy for who/phone to reach admin.
+
 ### 2026-10-30 — Accessibility & UX audit fixes (PR TBD)
 
 - **Storefront a11y** — product card image/name are real `<button>`s (keyboard + screen-reader accessible); qty −/+ buttons and chat/search inputs get `aria-label`s; checkout form gets labels, `type="tel"` and `autocomplete` on name/phone/location + labelled courier & referral selects; search placeholder no longer mentions hidden SKUs.
