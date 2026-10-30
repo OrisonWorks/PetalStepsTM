@@ -48,9 +48,9 @@ export function CartDrawer() {
                 <h4 className="text-sm font-bold">{i.name}</h4>
                 <p className="text-xs text-stone-500">EU size {i.size} · {money(i.price)}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <button className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-200" onClick={() => dec(i.key)}><Minus className="h-3 w-3" /></button>
+                  <button aria-label={`Decrease quantity of ${i.name}`} className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-200" onClick={() => dec(i.key)}><Minus className="h-3 w-3" /></button>
                   <span className="text-sm font-bold">{i.qty}</span>
-                  <button className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-200" onClick={() => inc(i.key)}><Plus className="h-3 w-3" /></button>
+                  <button aria-label={`Increase quantity of ${i.name}`} className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-200" onClick={() => inc(i.key)}><Plus className="h-3 w-3" /></button>
                 </div>
               </div>
               <div className="text-right">
@@ -63,17 +63,22 @@ export function CartDrawer() {
         <form onSubmit={checkout} className="space-y-2 border-t border-rose-100 p-5">
           <div className="flex justify-between border-t border-dashed border-rose-200 pt-2 text-base"><span>Total</span><strong>{money(subtotal)}</strong></div>
           <p className="text-xs text-stone-500">Delivery is separate: Lusaka — you book Yango after we confirm (Mon–Fri 10:00–16:00, Sat 09:00–13:00). Out of town — Platinum/Falcon or bus courier, cost after weighing. Pick up within 5 days or K5/day storage applies.</p>
-          <Input required placeholder="Your name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input required placeholder="Your number (WhatsApp)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-          <select value={form.courier} onChange={(e) => setForm({ ...form, courier: e.target.value })} className="h-11 w-full rounded-full border border-rose-200 bg-white px-4 text-sm outline-none focus:border-rose-400">
+          <label className="sr-only" htmlFor="bag-name">Your name</label>
+          <Input id="bag-name" required placeholder="Your name" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <label className="sr-only" htmlFor="bag-phone">Your WhatsApp number</label>
+          <Input id="bag-phone" required type="tel" autoComplete="tel" placeholder="Your number (WhatsApp)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <label className="sr-only" htmlFor="bag-location">Location</label>
+          <Input id="bag-location" placeholder="Location" autoComplete="address-level2" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <label className="sr-only" htmlFor="bag-courier">Courier of choice</label>
+          <select id="bag-courier" value={form.courier} onChange={(e) => setForm({ ...form, courier: e.target.value })} className="h-11 w-full rounded-full border border-rose-200 bg-white px-4 text-sm outline-none focus:border-rose-400">
             <option>Collect in store — Thompson Park, Lusaka</option>
             <option>Lusaka — Yango rider (I will book)</option>
             <option>Out of town — Platinum courier</option>
             <option>Out of town — Falcon courier</option>
             <option>Out of town — Bus courier</option>
           </select>
-          <select value={form.heard} onChange={(e) => setForm({ ...form, heard: e.target.value })} className="h-11 w-full rounded-full border border-rose-200 bg-white px-4 text-sm outline-none focus:border-rose-400">
+          <label className="sr-only" htmlFor="bag-heard">How did you hear about us?</label>
+          <select id="bag-heard" value={form.heard} onChange={(e) => setForm({ ...form, heard: e.target.value })} className="h-11 w-full rounded-full border border-rose-200 bg-white px-4 text-sm outline-none focus:border-rose-400">
             <option value="">How did you hear about us? (optional)</option>
             <option>Facebook</option>
             <option>Instagram</option>

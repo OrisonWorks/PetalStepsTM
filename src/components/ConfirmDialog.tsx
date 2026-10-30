@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ConfirmRequest = {
   title: string;
@@ -13,6 +13,7 @@ type Pending = ConfirmRequest & { resolve: (ok: boolean) => void };
 // true on confirm, false on cancel/Esc/backdrop.
 export function useConfirm() {
   const [req, setReq] = useState<Pending | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   const ask = useCallback(
     (r: ConfirmRequest) => new Promise<boolean>((resolve) => setReq({ ...r, resolve })),
@@ -31,11 +32,29 @@ export function useConfirm() {
 
   useEffect(() => {
     if (!req) return;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") settle(false);
+      // Keep Tab cycling inside the two buttons — a mini focus trap.
+      if (e.key === "Tab") {
+        const btns = boxRef.current?.querySelectorAll("button");
+        if (!btns?.length) return;
+        const first = btns[0];
+        const last = btns[btns.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
   }, [req, settle]);
 
   const dialog = req ? (
@@ -44,6 +63,7 @@ export function useConfirm() {
       onClick={() => settle(false)}
     >
       <div
+        ref={boxRef}
         role="alertdialog"
         aria-modal="true"
         aria-label={req.title}

@@ -12,15 +12,15 @@ const CAT_LABEL: Record<ClientProduct["cat"], string> = { matte: "Matte", glossy
 export function ProductCard({ product, onQuick }: { product: ClientProduct; onQuick: (p: ClientProduct) => void }) {
   const { add } = useCart();
   return (
-    <Card className="group flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10">
-      <div className="relative cursor-pointer bg-rose-50" onClick={() => onQuick(product)}>
-        <Image src={product.img} alt={product.name} width={700} height={860} sizes="(max-width: 1024px) 50vw, 25vw" className="h-[280px] w-full object-cover max-sm:h-52" />
+    <Card className="group flex flex-col overflow-hidden transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10">
+      <button type="button" className="relative block w-full cursor-pointer bg-rose-50 text-left" onClick={() => onQuick(product)} aria-label={`View sizes for ${product.name}`}>
+        <Image src={product.img} alt={product.name} width={700} height={860} sizes="(max-width: 1024px) 50vw, 25vw" loading="lazy" className="h-[280px] w-full object-cover max-sm:h-52" />
         {product.lowStock && <Badge className="absolute left-3 top-3">Only a few left</Badge>}
         {product.cat === "red-bottom" && <Badge variant="new" className="absolute right-3 top-3">Red Bottom</Badge>}
-      </div>
+      </button>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">{CAT_LABEL[product.cat]} · {product.color}</span>
-        <h3 className="font-display cursor-pointer text-lg font-semibold leading-snug hover:text-rose-500" onClick={() => onQuick(product)}>{product.name}</h3>
+        <h3 className="font-display text-lg font-semibold leading-snug"><button type="button" className="cursor-pointer text-left hover:text-rose-500" onClick={() => onQuick(product)}>{product.name}</button></h3>
         <div className="flex flex-wrap gap-1" title="EU sizes in stock">
           {[35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45].map((s) => (
             <span

@@ -6,8 +6,9 @@
   --font-script: "Great Vibes", cursive;
 }
 
-html { scroll-behavior: smooth; }
-body { background: #fff7f1; color: #24151b; font-family: var(--font-sans); }
+html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+body { background: #fff7f1; color: #24151b; font-family: var(--font-sans); touch-action: manipulation; }
+h1, h2, h3 { text-wrap: balance; }
 .font-display { font-family: var(--font-display); }
 .font-script { font-family: var(--font-script); }
 

@@ -149,6 +149,7 @@ export function ChatWidget({ products }: { products: ClientProduct[] }) {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                aria-label="Message the Petal Steps helper"
                 placeholder="Ask about a style, size, delivery…"
                 className="flex-1 rounded-xl border border-rose-100 px-3 py-2 text-sm outline-none focus:border-rose-300"
               />
