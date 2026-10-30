@@ -13,7 +13,7 @@ export function ProductCard({ product, onQuick }: { product: ClientProduct; onQu
   const { add } = useCart();
   return (
     <Card className="group flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10">
-      <div className="relative cursor-pointer animate-pulse bg-rose-50" onClick={() => onQuick(product)}>
+      <div className="relative cursor-pointer bg-rose-50" onClick={() => onQuick(product)}>
         <Image src={product.img} alt={product.name} width={700} height={860} sizes="(max-width: 1024px) 50vw, 25vw" className="h-[280px] w-full object-cover max-sm:h-52" />
         {product.lowStock && <Badge className="absolute left-3 top-3">Only a few left</Badge>}
         {product.cat === "red-bottom" && <Badge variant="new" className="absolute right-3 top-3">Red Bottom</Badge>}

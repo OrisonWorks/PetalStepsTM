@@ -13,3 +13,10 @@ body { background: #fff7f1; color: #24151b; font-family: var(--font-sans); }
 
 @keyframes marquee { to { transform: translateX(-50%); } }
 .animate-marquee { animation: marquee 26s linear infinite; }
+
+/* Accessibility: honor reduced-motion so nothing flashes or scrolls for
+   photosensitive viewers. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee, .animate-pulse { animation: none; }
+  html { scroll-behavior: auto; }
+}

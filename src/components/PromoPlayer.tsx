@@ -4,7 +4,7 @@ import { PetalPromo, PROMO } from "@/remotion/PetalPromo";
 
 const Player = dynamic(() => import("@remotion/player").then((m) => m.Player), {
   ssr: false,
-  loading: () => <div className="aspect-square w-full animate-pulse rounded-3xl bg-rose-100" />,
+  loading: () => <div className="aspect-square w-full rounded-3xl bg-rose-100" />,
 });
 
 export function PromoPlayer() {
