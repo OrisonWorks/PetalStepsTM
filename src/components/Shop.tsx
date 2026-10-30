@@ -18,17 +18,21 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 export const EU_SIZES = Array.from({ length: 11 }, (_, i) => 35 + i);
 
+// Fold case and punctuation so "red bottom" matches "Red-Bottom", "nude-pink"
+// matches "nude pink", and multi-word queries match across word boundaries.
+const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
 export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick, size, setSize }: {
   products: ClientProduct[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
   sort: string; setSort: (v: string) => void; onQuick: (p: ClientProduct) => void;
   size: number | null; setSize: (s: number | null) => void;
 }) {
   const list = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = norm(search);
     const filtered = products.filter((p) =>
       (filter === "all" || p.cat === filter || (filter === "low" && p.lowStock)) &&
       (size === null || !!p.stock[size]) &&
-      (`${p.name} ${p.color}`.toLowerCase().includes(q))
+      (!q || norm(`${p.name} ${p.color} ${p.cat} ${p.desc}`).includes(q))
     );
     if (sort === "low") filtered.sort((a, b) => a.price - b.price);
     if (sort === "high") filtered.sort((a, b) => b.price - a.price);

@@ -13,6 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Storefront search fixes (PR #38)
+
+- Search now normalizes both query and catalogue text (case + punctuation folded): "red bottom" matches "Red-Bottom", "nude-pink" = "nude pink". Match text widened from name+colour to name+colour+category+description, so "matte", "slingback", "kitten heel" all work.
+- Typing in the header search scrolls to `#shop` on the first keystroke so results are visible instead of changing off-screen below the hero.
+
 ### 2026-10-30 — Lead contacts + consent banner (PR #39)
 
 - **Consent banner** (`src/components/ConsentBanner.tsx`) — one-time banner until Accept/Decline, stored in localStorage `ps-consent`. Covers saving checkout name/number for order follow-up (the site has no tracking cookies); "No thanks" keeps taps anonymous and ordering still works.
