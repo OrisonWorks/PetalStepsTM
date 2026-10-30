@@ -52,7 +52,7 @@ export function Marquee() {
   const text = "Women's heels K450–K650 ✦ EU 35–45 ✦ Lusaka: book Yango for collection ✦ Out of town: Platinum & Falcon courier ✦ Official number +260 760 732 751 ✦ ";
   return (
     <div className="overflow-hidden whitespace-nowrap bg-stone-900 py-2.5 text-sm font-semibold text-rose-200">
-      <div className="animate-marquee inline-flex"><span className="pr-4">{text.repeat(2)}</span><span className="pr-4">{text.repeat(2)}</span></div>
+      <div className="animate-marquee inline-flex"><span className="pr-4">{text.repeat(2)}</span><span className="pr-4" aria-hidden="true">{text.repeat(2)}</span></div>
     </div>
   );
 }
@@ -66,8 +66,8 @@ export function Categories({ onSelect }: { onSelect: (f: Filter) => void }) {
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {CATS.map((c) => (
-          <button key={c.label} onClick={() => onSelect(c.filter)} className="group overflow-hidden rounded-2xl border border-rose-100 bg-white text-left transition hover:-translate-y-1 hover:border-rose-400 hover:shadow-xl hover:shadow-rose-500/10">
-            <Image src={c.img} alt={c.label} width={700} height={340} className="h-40 w-full object-cover transition group-hover:scale-105" />
+          <button key={c.label} onClick={() => onSelect(c.filter)} className="group overflow-hidden rounded-2xl border border-rose-100 bg-white text-left transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:border-rose-400 hover:shadow-xl hover:shadow-rose-500/10">
+            <Image src={c.img} alt={c.label} width={700} height={340} loading="lazy" className="h-40 w-full object-cover transition-transform group-hover:scale-105" />
             <span className="font-display block px-4 pt-3 text-xl font-semibold">{c.label}</span>
             <small className="block px-4 pb-4 text-stone-500">{c.sub}</small>
           </button>
@@ -135,7 +135,7 @@ export function Reviews() {
       <div className="grid gap-4 md:grid-cols-3">
         {REVIEWS.map((r) => (
           <Card key={r.name}><CardContent className="pt-6">
-            <div className="flex gap-0.5 text-amber-500">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>
+            <div className="flex gap-0.5 text-amber-500" aria-hidden="true">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>
             <blockquote className="mt-3 text-stone-600">“{r.text}”</blockquote>
             <figcaption className="mt-3 font-bold">— {r.name}</figcaption>
           </CardContent></Card>
@@ -171,8 +171,8 @@ export function Contact() {
           </div>
         </div>
         <form onSubmit={submit} className="space-y-3 rounded-3xl border border-rose-100 bg-white p-6 shadow-xl shadow-rose-500/10">
-          <label className="block text-sm font-semibold">Your name<Input required placeholder="e.g. Tumelo M." className="mt-1" /></label>
-          <label className="block text-sm font-semibold">Phone / WhatsApp<Input required placeholder="e.g. 071 234 5678" className="mt-1" /></label>
+          <label className="block text-sm font-semibold">Your name<Input required autoComplete="name" placeholder="e.g. Tumelo M." className="mt-1" /></label>
+          <label className="block text-sm font-semibold">Phone / WhatsApp<Input required type="tel" autoComplete="tel" placeholder="e.g. 071 234 5678" className="mt-1" /></label>
           <label className="block text-sm font-semibold">Message<textarea required rows={4} placeholder="Hi! Do you have the Pink Matte Stiletto in EU 39?" className="mt-1 w-full rounded-xl border border-rose-200 px-4 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-200" /></label>
           <Button type="submit" className="w-full">Send via WhatsApp →</Button>
         </form>
@@ -205,7 +205,7 @@ export function PolicyCards() {
             alt={c.title}
             width={300}
             height={380}
-            className="h-36 w-full object-cover object-top transition group-hover:scale-105"
+            className="h-36 w-full object-cover object-top transition-transform group-hover:scale-105"
           />
         </button>
       ))}
@@ -378,7 +378,8 @@ export function Newsletter() {
             aria-hidden="true"
             className="absolute -left-[9999px] h-0 w-0 opacity-0"
           />
-          <Input type="email" required placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} className="min-w-64 rounded-full" />
+          <label className="sr-only" htmlFor="petal-email">Your email address</label>
+          <Input id="petal-email" type="email" required autoComplete="email" placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} className="min-w-64 rounded-full" />
           <Button type="submit" disabled={busy}>{busy ? "Subscribing…" : "Subscribe"}</Button>
         </form>
       </div>

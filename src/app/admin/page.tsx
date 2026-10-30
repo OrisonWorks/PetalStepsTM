@@ -352,6 +352,7 @@ function ReportsPanel() {
           type="date"
           value={day}
           onChange={(e) => setDay(e.target.value)}
+          aria-label="Report date"
           className="rounded-lg border border-rose-100 px-3 py-1.5 text-sm outline-none focus:border-rose-300"
         />
         <button
@@ -1748,12 +1749,14 @@ function NewsletterPanel({ products }: { products: Product[] }) {
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Subject — e.g. New arrivals just landed"
+          aria-label="Newsletter subject"
           className={`${inputCls} mt-3`}
         />
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={"Write the message…\n\nBlank lines split paragraphs. Keep it short and warm."}
+          aria-label="Newsletter message"
           rows={6}
           className={`${inputCls} mt-2 resize-y`}
         />
@@ -1961,6 +1964,8 @@ export default function AdminPage() {
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
             placeholder="Passcode"
+            aria-label="Admin passcode"
+            autoComplete="current-password"
             className="flex-1 rounded-xl border border-rose-100 bg-white px-4 py-3 text-sm outline-none focus:border-rose-300"
             autoFocus
           />

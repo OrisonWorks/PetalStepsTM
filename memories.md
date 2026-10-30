@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Accessibility & UX audit fixes (PR TBD)
+
+- **Storefront a11y** — product card image/name are real `<button>`s (keyboard + screen-reader accessible); qty −/+ buttons and chat/search inputs get `aria-label`s; checkout form gets labels, `type="tel"` and `autocomplete` on name/phone/location + labelled courier & referral selects; search placeholder no longer mentions hidden SKUs.
+- **Admin a11y** — passcode field gets `aria-label` + `autocomplete="current-password"`; newsletter subject/message and report-date inputs labelled. (Edit/add-style forms already had wrapping labels.)
+- **Global** — skip-to-content link + `theme-color` in the layout, `touch-action: manipulation` + transparent tap-highlight + balanced headings in globals; ConfirmDialog gains a Tab focus trap + body scroll lock; decorative stars/marquee duplicate marked `aria-hidden`; explicit `transition-*` properties; below-fold images lazy-load.
+- **Deep-linkable shop** — `?cat=`, `?size=`, `?sort=`, `?q=` reflect the storefront filter/sort/size/search state — refresh-safe and shareable.
+
 ### 2026-10-29 — Report exports, table pagination, anti-blink accessibility (PR #35)
 
 - **Reports tab exports** — `CSV / Excel` and `Export PDF` buttons on the daily report. PDF is built client-side with jsPDF + autotable (lazily imported): `logo-mark.png` header, "PetalSteps™ — Daily report", date, KPI line, per-model sold/taps table.

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CartDrawer } from "@/components/CartDrawer";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Header } from "@/components/Header";
@@ -20,10 +20,30 @@ export function HomeClient({ products }: { products: ClientProduct[] }) {
     document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  // Deep-link shop state: ?cat / ?size / ?sort / ?q survive refresh and can be shared.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const cat = q.get("cat");
+    if (cat && ["all", "matte", "glossy", "statement", "red-bottom", "low"].includes(cat)) setFilter(cat as Filter);
+    const s = Number(q.get("size"));
+    if (s >= 35 && s <= 45) setSize(s);
+    if (["featured", "low", "high", "name"].includes(q.get("sort") || "")) setSort(q.get("sort")!);
+    if (q.get("q")) setSearch(q.get("q")!);
+  }, []);
+  useEffect(() => {
+    const q = new URLSearchParams();
+    if (filter !== "all") q.set("cat", filter);
+    if (size !== null) q.set("size", String(size));
+    if (sort !== "featured") q.set("sort", sort);
+    if (search) q.set("q", search);
+    const s = q.toString();
+    window.history.replaceState(null, "", s ? `?${s}` : window.location.pathname);
+  }, [filter, size, sort, search]);
+
   return (
     <>
       <Header search={search} setSearch={setSearch} />
-      <main>
+      <main id="main" tabIndex={-1}>
         <Hero styles={products.length} />
         <Marquee />
         <Reviews />
