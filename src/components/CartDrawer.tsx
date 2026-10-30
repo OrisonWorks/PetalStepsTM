@@ -63,8 +63,8 @@ export function CartDrawer() {
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {!items.length && (
-            <div className="flex flex-col items-center py-8 text-center">
-              <Lottie src="/lottie/empty-bag.lottie" className="h-32 w-32" />
+            <div className="flex flex-col items-center py-5 text-center">
+              <Lottie src="/lottie/empty-bag.lottie" className="h-24 w-24" />
               <p className="text-stone-500">Your bag is empty.<br />Add something beautiful 🌸</p>
             </div>
           )}
