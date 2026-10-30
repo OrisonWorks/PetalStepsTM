@@ -1925,9 +1925,11 @@ export default function AdminPage() {
   // Page/filter changes can unmount an open EditForm — funnel them through
   // the same discard confirm as closeEditor before they take effect.
   const goStockPage = async (p: number) => {
+    if (p === stockPg.page) return;
     if (await closeEditor()) stockPg.setPage(p);
   };
   const goStockFilter = async (f: typeof stockFilter) => {
+    if (f === stockFilter) return;
     if (await closeEditor()) setStockFilter(f);
   };
 
