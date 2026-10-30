@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-29 — Report exports, table pagination, anti-blink accessibility (PR #35)
+
+- **Reports tab exports** — `CSV / Excel` and `Export PDF` buttons on the daily report. PDF is built client-side with jsPDF + autotable (lazily imported): `logo-mark.png` header, "PetalSteps™ — Daily report", date, KPI line, per-model sold/taps table.
+- **`src/components/Pager.tsx`** — shared `usePager(items, per)` hook + `<Pager>` prev/next/numbered control (hides on single page, clamps when lists shrink). Applied to every admin list: stock cards (10/pg), subscribers (15), daily report rows (15), leads (15), analytics top-models + repeat-customers (10), bulk-import preview (10). Top-models/repeaters now show all rows paged instead of hard-capped.
+- **Storefront blinking removed** — the `animate-pulse` on every product card's image box (pulsed forever, not just while loading) and the promo loader are gone; `prefers-reduced-motion` also stops the marquee ticker and smooth-scroll for photosensitive viewers.
+
 ### 2026-10-29 — Confirm-before-write dialogs across /admin (PR #34)
 
 - New shared `useConfirm` hook + branded modal (`src/components/ConfirmDialog.tsx`) gates every mutating admin action: sold/restock/undo per size, product Edit save, add style, bulk CSV import, receipt create, newsletter send (replacing `window.confirm`), subscriber opt-out, and logout. Cancel/Esc/backdrop aborts.

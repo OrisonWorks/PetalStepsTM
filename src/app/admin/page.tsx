@@ -8,6 +8,7 @@ import { amountInWords } from "@/lib/money-words";
 import { waLink } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { Pager, usePager } from "@/components/Pager";
 
 const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
 
@@ -115,6 +116,48 @@ function downloadCsv(name: string, headers: string[], rows: (string | number)[][
   URL.revokeObjectURL(a.href);
 }
 
+// Daily report as a branded PDF: logo header, KPI line, model table.
+// jsPDF loads lazily so the admin bundle doesn't pay for it on every page.
+async function exportReportPdf(day: string, net: { sold: number; interest: number; restock: number }, modelRows: [string, number, number][]) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF();
+  try {
+    const blob = await fetch("/brand/logo-mark.png").then((r) => {
+      if (!r.ok) throw new Error("logo fetch failed");
+      return r.blob();
+    });
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result));
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", 14, 10, 15, 15);
+  } catch {
+    // Logo is decorative — export still works without it.
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(36, 21, 27);
+  doc.text("PetalSteps\u2122 — Daily report", 34, 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(120, 113, 108);
+  doc.text(day, 34, 24);
+  doc.setTextColor(36, 21, 27);
+  doc.setFontSize(11);
+  doc.text(`Pairs sold: ${net.sold}     Order taps: ${net.interest}     Restocks: ${net.restock}`, 14, 36);
+  autoTable(doc, {
+    startY: 42,
+    head: [["Model", "Sold", "Interest taps"]],
+    body: modelRows.map((r) => [r[0], String(r[1]), String(r[2])]),
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [244, 63, 94] },
+  });
+  doc.save(`petal-report-${day}.pdf`);
+}
+
 function SubscribersPanel() {
   const { ask, dialog } = useConfirm();
   const [subs, setSubs] = useState<Subscriber[]>([]);
@@ -143,6 +186,7 @@ function SubscribersPanel() {
   useEffect(() => { load(); }, []);
 
   const active = subs.filter((s) => !s.status);
+  const pg = usePager([...subs].reverse(), 15);
   const copyAll = async () => {
     try {
       await navigator.clipboard.writeText(active.map((s) => s.email).join(", "));
@@ -211,7 +255,7 @@ function SubscribersPanel() {
             </tr>
           </thead>
           <tbody>
-            {[...subs].reverse().map((s, i) => (
+            {pg.slice.map((s, i) => (
               <tr key={`${s.email}-${i}`} className="border-t border-rose-50">
                 <td className="py-2 font-semibold text-stone-700">
                   {s.email}
@@ -238,6 +282,7 @@ function SubscribersPanel() {
           </tbody>
         </table>
       )}
+      <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
       <p className="mt-4 text-xs text-stone-400">
         Stored on the SUBSCRIBERS tab of your stock sheet — “Copy all emails” gives the active
         addresses for a BCC email or broadcast tool. Reply-STOP requests: hit “stop” on their row
@@ -287,6 +332,14 @@ function ReportsPanel() {
     }
   });
 
+  const modelRows: [string, number, number][] = Array.from(
+    new Set([...byModel.keys(), ...interestByModel.keys()])
+  ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0]);
+  const pg = usePager(modelRows, 15);
+  const exportPdf = () => {
+    exportReportPdf(day, net, modelRows).catch(() => toast.error("PDF export failed"));
+  };
+
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -304,6 +357,22 @@ function ReportsPanel() {
         >
           {loading ? "Loading…" : "Load"}
         </button>
+        {loaded && modelRows.length > 0 && (
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => downloadCsv(`petal-report-${day}.csv`, ["model", "sold", "interest taps"], modelRows)}
+              className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
+            >
+              CSV / Excel
+            </button>
+            <button
+              onClick={exportPdf}
+              className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
+            >
+              Export PDF
+            </button>
+          </div>
+        )}
       </div>
       {loaded && (
         <>
@@ -330,11 +399,11 @@ function ReportsPanel() {
               </tr>
             </thead>
             <tbody>
-              {Array.from(new Set([...byModel.keys(), ...interestByModel.keys()])).map((m) => (
+              {pg.slice.map(([m, sold, taps]) => (
                 <tr key={m} className="border-t border-rose-50">
                   <td className="py-2 font-semibold text-stone-700">{m}</td>
-                  <td className="py-2 text-right">{byModel.get(m) || 0}</td>
-                  <td className="py-2 text-right text-stone-500">{interestByModel.get(m) || 0}</td>
+                  <td className="py-2 text-right">{sold}</td>
+                  <td className="py-2 text-right text-stone-500">{taps}</td>
                 </tr>
               ))}
               {net.sold === 0 && net.interest === 0 && (
@@ -342,6 +411,7 @@ function ReportsPanel() {
               )}
             </tbody>
           </table>
+          <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
         </>
       )}
     </div>
@@ -798,6 +868,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
   };
 
   const valid = items?.filter((i) => !i.error && !i.done).length ?? 0;
+  const pg = usePager(items || [], 10);
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-5">
@@ -822,9 +893,9 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       </div>
       {items && items.length > 0 && (
         <div className="mt-4">
-          <div className="max-h-64 overflow-y-auto rounded-xl border border-stone-100">
+          <div className="rounded-xl border border-stone-100">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-stone-50 text-stone-500">
+              <thead className="bg-stone-50 text-stone-500">
                 <tr>
                   <th className="px-3 py-2">Style code</th>
                   <th className="px-3 py-2">Name</th>
@@ -834,7 +905,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
+                {pg.slice.map((it, i) => (
                   <tr key={i} className="border-t border-stone-100">
                     <td className="px-3 py-2 font-mono">{it.sku || "—"}</td>
                     <td className="px-3 py-2">{it.name || "—"}</td>
@@ -852,6 +923,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
               </tbody>
             </table>
           </div>
+          <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
           <button
             type="button"
             disabled={importing || valid === 0}
@@ -1204,8 +1276,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   });
   const topModels = Array.from(new Set([...soldByModel.keys(), ...tapsByModel.keys()]))
     .map((m) => ({ m, sold: soldByModel.get(m) || 0, taps: tapsByModel.get(m) || 0 }))
-    .sort((a, b) => b.sold - a.sold || b.taps - a.taps)
-    .slice(0, 12);
+    .sort((a, b) => b.sold - a.sold || b.taps - a.taps);
 
   // Sell-through per style: sold in range ÷ (sold + stock on hand now).
   // Only meaningful against LIVE sheet stock — the fallback catalogue has no
@@ -1359,24 +1430,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
         </div>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-2xl border border-rose-100 bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-stone-800">Top models — sold vs interest</h3>
-            <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "sold", "order taps"], topModels.map((t) => [t.m, t.sold, t.taps]))} className="text-xs font-semibold text-rose-500">CSV</button>
-          </div>
-          <table className="mt-3 w-full text-sm">
-            <tbody>
-              {topModels.map((t) => (
-                <tr key={t.m} className="border-t border-rose-50">
-                  <td className="py-1.5 font-semibold text-stone-700">{t.m}</td>
-                  <td className="py-1.5 text-right">{t.sold}</td>
-                  <td className="py-1.5 text-right text-stone-400">{t.taps}</td>
-                </tr>
-              ))}
-              {!topModels.length && <tr><td className="py-4 text-center text-stone-400">No activity in range</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <TopModelsTable rows={topModels} range={range} />
         <div className="space-y-3">
           <div className="rounded-2xl border border-rose-100 bg-white p-4">
             <h3 className="font-semibold text-stone-800">Size demand (sold + taps)</h3>
@@ -1430,25 +1484,58 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
           </div>
         </div>
       </div>
-      <div className="rounded-2xl border border-rose-100 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-stone-800">Repeat customers ({repeaters.length})</h3>
-          <button onClick={() => downloadCsv("petal-repeat-customers.csv", ["phone", "name", "receipts", "total K"], repeaters.map(([ph, v]) => [ph, v.name, v.count, v.total]))} className="text-xs font-semibold text-rose-500">CSV</button>
-        </div>
-        <table className="mt-3 w-full text-sm">
-          <tbody>
-            {repeaters.slice(0, 10).map(([ph, v]) => (
-              <tr key={ph} className="border-t border-rose-50">
-                <td className="py-1.5 font-semibold text-stone-700">{v.name}</td>
-                <td className="py-1.5 text-stone-400">{ph}</td>
-                <td className="py-1.5 text-right">{v.count} receipts</td>
-                <td className="py-1.5 text-right font-semibold">K{v.total}</td>
-              </tr>
-            ))}
-            {!repeaters.length && <tr><td className="py-4 text-center text-stone-400">No repeat customers yet (matched by phone)</td></tr>}
-          </tbody>
-        </table>
+      <RepeatersTable repeaters={repeaters} />
+    </div>
+  );
+}
+
+function TopModelsTable({ rows, range }: { rows: { m: string; sold: number; taps: number }[]; range: number }) {
+  const pg = usePager(rows, 10);
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-stone-800">Top models — sold vs interest</h3>
+        <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "sold", "order taps"], rows.map((t) => [t.m, t.sold, t.taps]))} className="text-xs font-semibold text-rose-500">CSV</button>
       </div>
+      <table className="mt-3 w-full text-sm">
+        <tbody>
+          {pg.slice.map((t) => (
+            <tr key={t.m} className="border-t border-rose-50">
+              <td className="py-1.5 font-semibold text-stone-700">{t.m}</td>
+              <td className="py-1.5 text-right">{t.sold}</td>
+              <td className="py-1.5 text-right text-stone-400">{t.taps}</td>
+            </tr>
+          ))}
+          {!rows.length && <tr><td className="py-4 text-center text-stone-400">No activity in range</td></tr>}
+        </tbody>
+      </table>
+      <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
+    </div>
+  );
+}
+
+function RepeatersTable({ repeaters }: { repeaters: [string, { name: string; count: number; total: number }][] }) {
+  const pg = usePager(repeaters, 10);
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-stone-800">Repeat customers ({repeaters.length})</h3>
+        <button onClick={() => downloadCsv("petal-repeat-customers.csv", ["phone", "name", "receipts", "total K"], repeaters.map(([ph, v]) => [ph, v.name, v.count, v.total]))} className="text-xs font-semibold text-rose-500">CSV</button>
+      </div>
+      <table className="mt-3 w-full text-sm">
+        <tbody>
+          {pg.slice.map(([ph, v]) => (
+            <tr key={ph} className="border-t border-rose-50">
+              <td className="py-1.5 font-semibold text-stone-700">{v.name}</td>
+              <td className="py-1.5 text-stone-400">{ph}</td>
+              <td className="py-1.5 text-right">{v.count} receipts</td>
+              <td className="py-1.5 text-right font-semibold">K{v.total}</td>
+            </tr>
+          ))}
+          {!repeaters.length && <tr><td className="py-4 text-center text-stone-400">No repeat customers yet (matched by phone)</td></tr>}
+        </tbody>
+      </table>
+      <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
     </div>
   );
 }
@@ -1489,6 +1576,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
     return { l, p, inStock: p ? (p.stock[s] || 0) > 0 : false };
   });
   const shown = rows.filter((r) => (show === "all" ? true : show === "stocked" ? r.inStock : !r.inStock));
+  const pg = usePager(shown, 15);
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
@@ -1543,7 +1631,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {pg.slice.map((r) => (
               <tr key={`${r.l.model}-${r.l.size}`} className="border-t border-rose-50">
                 <td className="py-1.5 font-semibold text-stone-700">{r.p?.name || r.l.model} <span className="font-normal text-stone-400">{r.l.model}</span></td>
                 <td className="py-1.5 text-stone-500">EU {r.l.size}</td>
@@ -1559,6 +1647,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
           </tbody>
         </table>
       )}
+      <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
     </div>
   );
 }
@@ -1818,6 +1907,15 @@ export default function AdminPage() {
     }
   };
 
+  const stockShown = products.filter((p) => {
+    const tp = totalPairs(p);
+    if (stockFilter === "low") return tp > 0 && tp <= 5;
+    if (stockFilter === "out") return tp === 0;
+    if (stockFilter === "all") return true;
+    return p.cat === stockFilter;
+  });
+  const stockPg = usePager(stockShown, 10);
+
   if (state === "loading") {
     return <main className="mx-auto w-[min(720px,92%)] py-16 text-center text-stone-500">Loading…</main>;
   }
@@ -1940,13 +2038,7 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
-        {products.filter((p) => {
-          const tp = totalPairs(p);
-          if (stockFilter === "low") return tp > 0 && tp <= 5;
-          if (stockFilter === "out") return tp === 0;
-          if (stockFilter === "all") return true;
-          return p.cat === stockFilter;
-        }).map((p) => (
+        {stockPg.slice.map((p) => (
           <section key={p.sku} className="rounded-2xl border border-rose-100 bg-white p-4">
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2017,6 +2109,7 @@ export default function AdminPage() {
             </div>
           </section>
         ))}
+        <Pager page={stockPg.page} pages={stockPg.pages} onPage={stockPg.setPage} />
       </div>}
       {dialog}
     </main>
