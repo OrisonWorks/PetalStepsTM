@@ -22,6 +22,9 @@ export function CartDrawer() {
     const lines = items.map((i) => `• ${i.name} — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
     const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}${form.heard ? `\nHeard about you via: ${form.heard}` : ""}\n\nPlease confirm availability before I pay. Thank you!`;
     setSent(true);
+    // Clear submitted items now (the success overlay covers the drawer anyway) so
+    // anything added during the WhatsApp-open delay isn't wiped with the order.
+    clear();
     // Fire-and-forget interest log — never blocks or errors the checkout.
     items.forEach((i) =>
       fetch("/api/log-interest", {
@@ -40,7 +43,7 @@ export function CartDrawer() {
     );
     setTimeout(() => {
       window.open(waLink(msg), "_blank");
-      clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" }); setSent(false); setOpen(false);
+      setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" }); setSent(false); setOpen(false);
     }, 1600);
   };
 

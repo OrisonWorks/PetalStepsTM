@@ -1,6 +1,10 @@
 "use client";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+
+// Player chunk loads only when an animation actually renders — reduced-motion
+// visitors never download it.
+const DotLottieReact = dynamic(() => import("@lottiefiles/dotlottie-react").then((m) => m.DotLottieReact), { ssr: false });
 
 /** dotLottie wrapper that renders nothing under prefers-reduced-motion. */
 export function Lottie({ src, className, loop = true, autoplay = true, speed = 1 }: {
