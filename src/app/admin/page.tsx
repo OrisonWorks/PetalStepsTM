@@ -118,7 +118,7 @@ function downloadCsv(name: string, headers: string[], rows: (string | number)[][
 
 // Daily report as a branded PDF: logo header, KPI line, model table.
 // jsPDF loads lazily so the admin bundle doesn't pay for it on every page.
-async function exportReportPdf(day: string, net: { sold: number; interest: number; restock: number }, modelRows: [string, number, number, number][]) {
+async function exportReportPdf(day: string, net: { sold: number; interest: number; restock: number }, modelRows: [string, number, number, number][], styleOf: (model: string) => { name: string; color: string } | null) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF();
@@ -150,8 +150,11 @@ async function exportReportPdf(day: string, net: { sold: number; interest: numbe
   doc.text(`Pairs sold: ${net.sold}     Order taps: ${net.interest}     Restocks: ${net.restock}`, 14, 36);
   autoTable(doc, {
     startY: 42,
-    head: [["Model", "Sold", "Interest taps", "Restocks"]],
-    body: modelRows.map((r) => [r[0], String(r[1]), String(r[2]), String(r[3])]),
+    head: [["Style", "Model", "Sold", "Interest taps", "Restocks"]],
+    body: modelRows.map((r) => {
+      const s = styleOf(r[0]);
+      return [s ? `${s.name} · ${s.color}` : r[0], s ? r[0] : "", String(r[1]), String(r[2]), String(r[3])];
+    }),
     styles: { fontSize: 10 },
     headStyles: { fillColor: [244, 63, 94] },
   });
@@ -293,7 +296,7 @@ function SubscribersPanel() {
   );
 }
 
-function ReportsPanel() {
+function ReportsPanel({ products }: { products: Product[] }) {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadedDay, setLoadedDay] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
@@ -340,8 +343,10 @@ function ReportsPanel() {
     new Set([...byModel.keys(), ...interestByModel.keys(), ...restockByModel.keys()])
   ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0, restockByModel.get(m) || 0]);
   const pg = usePager(modelRows, 15);
+  const bySku = useMemo(() => new Map(products.map((p) => [p.sku, p])), [products]);
+  const styleOf = (m: string) => { const p = bySku.get(m); return p ? { name: p.name, color: p.color } : null; };
   const exportPdf = () => {
-    exportReportPdf(loadedDay, net, modelRows).catch(() => toast.error("PDF export failed"));
+    exportReportPdf(loadedDay, net, modelRows, styleOf).catch(() => toast.error("PDF export failed"));
   };
 
   return (
@@ -365,7 +370,7 @@ function ReportsPanel() {
         {loaded && modelRows.length > 0 && (
           <div className="ml-auto flex gap-2">
             <button
-              onClick={() => downloadCsv(`petal-report-${loadedDay}.csv`, ["model", "sold", "interest taps", "restocks"], modelRows)}
+              onClick={() => downloadCsv(`petal-report-${loadedDay}.csv`, ["model", "name", "colour", "sold", "interest taps", "restocks"], modelRows.map(([m, s, t, rs]) => { const p = bySku.get(m); return [m, p?.name || "", p?.color || "", s, t, rs]; }))}
               className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
             >
               CSV / Excel
@@ -398,7 +403,7 @@ function ReportsPanel() {
           <table className="mt-4 w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
-                <th className="pb-2">Model</th>
+                <th className="pb-2">Style</th>
                 <th className="pb-2 text-right">Sold</th>
                 <th className="pb-2 text-right">Interest taps</th>
                 <th className="pb-2 text-right">Restocks</th>
@@ -407,7 +412,10 @@ function ReportsPanel() {
             <tbody>
               {pg.slice.map(([m, sold, taps, restocks]) => (
                 <tr key={m} className="border-t border-rose-50">
-                  <td className="py-2 font-semibold text-stone-700">{m}</td>
+                  <td className="py-2">
+                    <span className="font-semibold text-stone-700">{(() => { const s = styleOf(m); return s ? `${s.name} · ${s.color}` : m; })()}</span>
+                    {bySku.has(m) && <span className="block text-xs text-stone-400">{m}</span>}
+                  </td>
                   <td className="py-2 text-right">{sold}</td>
                   <td className="py-2 text-right text-stone-500">{taps}</td>
                   <td className="py-2 text-right text-stone-500">{restocks}</td>
@@ -1428,16 +1436,17 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
           <h3 className="font-semibold text-stone-800">Sell-through — % of stock sold</h3>
           <div className="mt-3 space-y-1">
-            {sellThrough.map((x) => (
-              <Bar key={x.m} label={x.m} value={x.pct} max={maxSell} color="bg-emerald-400" />
-            ))}
+            {sellThrough.map((x) => {
+              const p = products.find((q) => q.sku === x.m);
+              return <Bar key={x.m} label={p ? `${p.name} · ${p.color}` : x.m} value={x.pct} max={maxSell} color="bg-emerald-400" />;
+            })}
             {!sellThrough.length && <p className="text-sm text-stone-400">{stockLive ? "No sales in range" : "Needs live stock — catalogue is on fallback"}</p>}
           </div>
           <p className="mt-2 text-xs text-stone-400">sold ÷ (sold + stock on hand) in range — high % styles are selling out.</p>
         </div>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        <TopModelsTable rows={topModels} range={range} />
+        <TopModelsTable rows={topModels} range={range} products={products} />
         <div className="space-y-3">
           <div className="rounded-2xl border border-rose-100 bg-white p-4">
             <h3 className="font-semibold text-stone-800">Size demand (sold + taps)</h3>
@@ -1496,19 +1505,20 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   );
 }
 
-function TopModelsTable({ rows, range }: { rows: { m: string; sold: number; taps: number }[]; range: number }) {
+function TopModelsTable({ rows, range, products }: { rows: { m: string; sold: number; taps: number }[]; range: number; products: Product[] }) {
   const pg = usePager(rows, 10);
+  const bySku = new Map(products.map((p) => [p.sku, p]));
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-stone-800">Top models — sold vs interest</h3>
-        <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "sold", "order taps"], rows.map((t) => [t.m, t.sold, t.taps]))} className="text-xs font-semibold text-rose-500">CSV</button>
+        <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "name", "colour", "sold", "order taps"], rows.map((t) => { const p = bySku.get(t.m); return [t.m, p?.name || "", p?.color || "", t.sold, t.taps]; }))} className="text-xs font-semibold text-rose-500">CSV</button>
       </div>
       <table className="mt-3 w-full text-sm">
         <tbody>
           {pg.slice.map((t) => (
             <tr key={t.m} className="border-t border-rose-50">
-              <td className="py-1.5 font-semibold text-stone-700">{t.m}</td>
+              <td className="py-1.5 font-semibold text-stone-700">{(() => { const p = bySku.get(t.m); return p ? `${p.name} · ${p.color}` : t.m; })()} <span className="font-normal text-xs text-stone-400">{t.m}</span></td>
               <td className="py-1.5 text-right">{t.sold}</td>
               <td className="py-1.5 text-right text-stone-400">{t.taps}</td>
             </tr>
@@ -2048,7 +2058,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-      {view === "reports" && <div className="mt-6"><ReportsPanel /></div>}
+      {view === "reports" && <div className="mt-6"><ReportsPanel products={products} /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
       {view === "newsletter" && <div className="mt-6"><NewsletterPanel products={products} /></div>}

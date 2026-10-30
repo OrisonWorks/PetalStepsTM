@@ -13,7 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Lottie animations (PR TBD)
+### 2026-10-30 — Style names + colours in admin reports (PR TBD)
+
+- Reports tab daily table, its CSV (`model,name,colour,sold,…`) and the PDF now show `Name · Colour` with the SKU code kept as a subtext/second column.
+- Analytics: Top models table + CSV and the Sell-through bars label styles as `Name · Colour` too (Leads already showed names).
+
+### 2026-10-30 — Lottie animations (PR #40)
 
 - **`src/components/Lottie.tsx`** — dotLottie wrapper (`@lottiefiles/dotlottie-react`, files in `public/lottie/`) that renders nothing under `prefers-reduced-motion`, keeping the photosensitivity rule intact.
 - **Order sent** — checkout submit now shows an in-drawer checkmark animation + "Order ready — opening WhatsApp…" (~1.6s) before wa.me opens, replacing the plain toast.
