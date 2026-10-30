@@ -20,7 +20,7 @@ export const EU_SIZES = Array.from({ length: 11 }, (_, i) => 35 + i);
 
 // Fold case and punctuation so "red bottom" matches "Red-Bottom", "nude-pink"
 // matches "nude pink", and multi-word queries match across word boundaries.
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 export function Shop({ products, filter, setFilter, search, sort, setSort, onQuick, size, setSize }: {
   products: ClientProduct[]; filter: Filter; setFilter: (f: Filter) => void; search: string;
