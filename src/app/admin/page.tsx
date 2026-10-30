@@ -1333,11 +1333,11 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   const tapsArea = new Map<string, number>();
   net.forEach(({ r }) => {
     const note = String(r.note || "");
-    // Notes are built as `qty N · via X · in Y` — each segment stops at the
-    // next `·` so a later segment can't bleed into the earlier capture.
+    // Notes are built as `qty N · via X · in Y [· for NAME · tel PHONE]` — each
+    // segment stops at the next `·` so a later segment can't bleed into the capture.
     const h = /(?:^| · )via ([^·]+?)\s*(?:·|$)/i.exec(note);
     if (h) heardMix.set(h[1].trim(), (heardMix.get(h[1].trim()) || 0) + 1);
-    const loc = / · in ([^·]+?)\s*$/.exec(note);
+    const loc = / · in ([^·]+?)\s*(?:·|$)/.exec(note);
     if (loc) tapsArea.set(loc[1].trim(), (tapsArea.get(loc[1].trim()) || 0) + 1);
   });
   receipts.forEach((r) => {
