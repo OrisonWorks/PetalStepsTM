@@ -1937,12 +1937,12 @@ export default function AdminPage() {
   };
 
   if (state === "loading") {
-    return <main className="mx-auto w-[min(720px,92%)] py-16 text-center text-stone-500">Loading…</main>;
+    return <main id="main" tabIndex={-1} className="mx-auto w-[min(720px,92%)] py-16 text-center text-stone-500">Loading…</main>;
   }
 
   if (!configured) {
     return (
-      <main className="mx-auto w-[min(720px,92%)] py-16 text-center">
+      <main id="main" tabIndex={-1} className="mx-auto w-[min(720px,92%)] py-16 text-center">
         <h1 className="text-2xl font-bold text-stone-800">Admin not configured</h1>
         <p className="mt-3 text-stone-500">
           Set <code>ADMIN_PASSCODE</code>, <code>STOCK_WRITER_URL</code> and{" "}
@@ -1954,7 +1954,7 @@ export default function AdminPage() {
 
   if (state === "login") {
     return (
-      <main className="mx-auto w-[min(420px,92%)] py-16">
+      <main id="main" tabIndex={-1} className="mx-auto w-[min(420px,92%)] py-16">
         <Image src="/brand/logo-mark.png" alt="Petal Steps by Thandiwe Mwaba" width={1013} height={552} className="h-16 w-auto" />
         <h1 className="mt-3 font-script text-3xl text-rose-500">Stock admin</h1>
         <p className="mt-1 text-sm text-stone-500">Sign in to mark sizes sold or restock.</p>
@@ -1978,7 +1978,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="mx-auto w-[min(1180px,94%)] py-8">
+    <main id="main" tabIndex={-1} className="mx-auto w-[min(1180px,94%)] py-8">
       <div className="flex items-center gap-3">
         <Image src="/brand/logo.jpg" alt="Petal Steps" width={1080} height={1080} className="h-10 w-10 rounded-full" />
         <h1 className="font-script text-3xl text-rose-500">Stock admin</h1>

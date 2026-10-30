@@ -36,11 +36,11 @@ export default function ReceiptPage({ params }: { params: Promise<{ no: string }
   }, [no]);
 
   if (state === "loading") {
-    return <main className="mx-auto w-[min(720px,92%)] py-20 text-center text-stone-500">Loading receipt…</main>;
+    return <main id="main" tabIndex={-1} className="mx-auto w-[min(720px,92%)] py-20 text-center text-stone-500">Loading receipt…</main>;
   }
   if (state === "error" || !r) {
     return (
-      <main className="mx-auto w-[min(720px,92%)] py-20 text-center">
+      <main id="main" tabIndex={-1} className="mx-auto w-[min(720px,92%)] py-20 text-center">
         <h1 className="text-2xl font-bold text-stone-800">Receipt not found</h1>
         <p className="mt-2 text-stone-500">Check the link or contact Petal Steps on WhatsApp +260 760 732 751.</p>
       </main>
@@ -51,7 +51,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ no: string }
   const method = (r.method || "").toLowerCase();
 
   return (
-    <main className="mx-auto w-[min(680px,94%)] py-8">
+    <main id="main" tabIndex={-1} className="mx-auto w-[min(680px,94%)] py-8">
       <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-xl shadow-rose-500/5 print:border-0 print:shadow-none">
         {/* brand header */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-stone-800 pb-4">
