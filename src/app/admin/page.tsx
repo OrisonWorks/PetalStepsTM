@@ -250,7 +250,8 @@ function SubscribersPanel() {
           No subscribers yet — signups from the site footer appear here.
         </p>
       ) : (
-        <table className="mt-4 w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="min-w-[420px] mt-4 w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
               <th className="pb-2">Email</th>
@@ -284,6 +285,7 @@ function SubscribersPanel() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
       <p className="mt-4 text-xs text-stone-400">
@@ -400,7 +402,8 @@ function ReportsPanel({ products }: { products: Product[] }) {
               <span className="text-xs text-stone-500">restocks</span>
             </div>
           </div>
-          <table className="mt-4 w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="min-w-[480px] mt-4 w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
                 <th className="pb-2">Style</th>
@@ -426,6 +429,7 @@ function ReportsPanel({ products }: { products: Product[] }) {
               )}
             </tbody>
           </table>
+          </div>
           <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
         </>
       )}
@@ -909,7 +913,8 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       {items && items.length > 0 && (
         <div className="mt-4">
           <div className="rounded-xl border border-stone-100">
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto">
+            <table className="min-w-[640px] w-full text-left text-xs">
               <thead className="bg-stone-50 text-stone-500">
                 <tr>
                   <th className="px-3 py-2">Style code</th>
@@ -937,6 +942,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
           <button
@@ -1515,7 +1521,8 @@ function TopModelsTable({ rows, range, products }: { rows: { m: string; sold: nu
         <h3 className="font-semibold text-stone-800">Top models — sold vs interest</h3>
         <button onClick={() => downloadCsv(`petal-models-${range}d.csv`, ["model", "name", "colour", "sold", "order taps"], rows.map((t) => { const p = bySku.get(t.m); return [t.m, p?.name || "", p?.color || "", t.sold, t.taps]; }))} className="text-xs font-semibold text-rose-500">CSV</button>
       </div>
-      <table className="mt-3 w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="min-w-[460px] mt-3 w-full text-sm">
         <tbody>
           {pg.slice.map((t) => (
             <tr key={t.m} className="border-t border-rose-50">
@@ -1527,6 +1534,7 @@ function TopModelsTable({ rows, range, products }: { rows: { m: string; sold: nu
           {!rows.length && <tr><td className="py-4 text-center text-stone-400">No activity in range</td></tr>}
         </tbody>
       </table>
+      </div>
       <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
     </div>
   );
@@ -1540,7 +1548,8 @@ function RepeatersTable({ repeaters }: { repeaters: [string, { name: string; cou
         <h3 className="font-semibold text-stone-800">Repeat customers ({repeaters.length})</h3>
         <button onClick={() => downloadCsv("petal-repeat-customers.csv", ["phone", "name", "receipts", "total K"], repeaters.map(([ph, v]) => [ph, v.name, v.count, v.total]))} className="text-xs font-semibold text-rose-500">CSV</button>
       </div>
-      <table className="mt-3 w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="min-w-[480px] mt-3 w-full text-sm">
         <tbody>
           {pg.slice.map(([ph, v]) => (
             <tr key={ph} className="border-t border-rose-50">
@@ -1553,6 +1562,7 @@ function RepeatersTable({ repeaters }: { repeaters: [string, { name: string; cou
           {!repeaters.length && <tr><td className="py-4 text-center text-stone-400">No repeat customers yet (matched by phone)</td></tr>}
         </tbody>
       </table>
+      </div>
       <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
     </div>
   );
@@ -1641,7 +1651,8 @@ function LeadsPanel({ products }: { products: Product[] }) {
       ) : shown.length === 0 ? (
         <p className="mt-4 text-sm text-stone-400">{leads.length === 0 ? "No open leads — every order tap so far became a sale." : "No leads in this filter."}</p>
       ) : (
-        <table className="mt-3 w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="min-w-[620px] mt-3 w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
               <th className="pb-1">Style</th><th className="pb-1">Size</th><th className="pb-1">Contact</th><th className="pb-1 text-right">Taps</th>
@@ -1683,6 +1694,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
     </div>

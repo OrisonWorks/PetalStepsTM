@@ -13,7 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Style names + colours in admin reports (PR TBD)
+### 2026-10-30 — Admin tables scroll on phones (PR TBD)
+
+- All six admin tables (subscribers, daily report, bulk-import preview, top models, repeat customers, leads) wrapped in `overflow-x-auto` with a `min-w-*` so columns stay readable on narrow screens instead of squishing. Stock rows already used flex-wrap and need nothing.
+
+### 2026-10-30 — Style names + colours in admin reports (PR #41)
 
 - Reports tab daily table, its CSV (`model,name,colour,sold,…`) and the PDF now show `Name · Colour` with the SKU code kept as a subtext/second column.
 - Analytics: Top models table + CSV and the Sell-through bars label styles as `Name · Colour` too (Leads already showed names).
