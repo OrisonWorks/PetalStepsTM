@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Lottie animations (PR TBD)
+
+- **`src/components/Lottie.tsx`** — dotLottie wrapper (`@lottiefiles/dotlottie-react`, files in `public/lottie/`) that renders nothing under `prefers-reduced-motion`, keeping the photosensitivity rule intact.
+- **Order sent** — checkout submit now shows an in-drawer checkmark animation + "Order ready — opening WhatsApp…" (~1.6s) before wa.me opens, replacing the plain toast.
+- **Empty bag** — animated empty-bag illustration in the cart drawer empty state.
+- **Hero** — slow falling-petals accent behind the hero content (50% opacity, pointer-events-none, aria-hidden).
+
 ### 2026-10-30 — Storefront search fixes (PR #38)
 
 - Search now normalizes both query and catalogue text (case + punctuation folded): "red bottom" matches "Red-Bottom", "nude-pink" = "nude pink". Match text widened from name+colour to name+colour+category+description, so "matte", "slingback", "kitten heel" all work.
