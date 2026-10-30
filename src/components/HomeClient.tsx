@@ -32,13 +32,17 @@ export function HomeClient({ products }: { products: ClientProduct[] }) {
     if (q.get("q")) setSearch(q.get("q")!);
   }, []);
   useEffect(() => {
-    const q = new URLSearchParams();
-    if (filter !== "all") q.set("cat", filter);
-    if (size !== null) q.set("size", String(size));
-    if (sort !== "featured") q.set("sort", sort);
-    if (search) q.set("q", search);
-    const s = q.toString();
-    window.history.replaceState(null, "", s ? `?${s}` : window.location.pathname);
+    // Update only our keys — keep the #anchor and any unrelated params.
+    const url = new URL(window.location.href);
+    const set = (k: string, v: string | null) => {
+      if (v === null) url.searchParams.delete(k);
+      else url.searchParams.set(k, v);
+    };
+    set("cat", filter === "all" ? null : filter);
+    set("size", size === null ? null : String(size));
+    set("sort", sort === "featured" ? null : sort);
+    set("q", search || null);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   }, [filter, size, sort, search]);
 
   return (
