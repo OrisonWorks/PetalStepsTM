@@ -1298,6 +1298,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   // stock for sheet-created styles and would fake 100% sell-outs. SKUs missing
   // from the map are skipped rather than treated as zero stock.
   const stockBySku = new Map(products.map((p) => [p.sku, totalPairs(p)]));
+  const productBySku = new Map(products.map((p) => [p.sku, p]));
   const sellThrough = !stockLive ? [] : Array.from(soldByModel.entries())
     .filter(([m, sold]) => sold > 0 && stockBySku.has(m))
     .map(([m, sold]) => ({ m, sold, pct: Math.round((sold / Math.max(1, sold + stockBySku.get(m)!)) * 100) }))
@@ -1437,7 +1438,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
           <h3 className="font-semibold text-stone-800">Sell-through — % of stock sold</h3>
           <div className="mt-3 space-y-1">
             {sellThrough.map((x) => {
-              const p = products.find((q) => q.sku === x.m);
+              const p = productBySku.get(x.m);
               return <Bar key={x.m} label={p ? `${p.name} · ${p.color}` : x.m} value={x.pct} max={maxSell} color="bg-emerald-400" />;
             })}
             {!sellThrough.length && <p className="text-sm text-stone-400">{stockLive ? "No sales in range" : "Needs live stock — catalogue is on fallback"}</p>}
