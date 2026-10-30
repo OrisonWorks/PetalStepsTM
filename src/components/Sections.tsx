@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Lottie } from "@/components/Lottie";
 import { PromoPlayer } from "@/components/PromoPlayer";
 import { useCart } from "@/context/cart-context";
 import { FB_URL, money, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
@@ -22,8 +23,11 @@ const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
 
 export function Hero({ styles = 29 }: { styles?: number }) {
   return (
-    <section id="top" className="bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
-      <div className="mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
+    <section id="top" className="relative overflow-hidden bg-gradient-to-br from-[#fde8d7] via-[#fff7f1] to-[#f3e8ff] py-14">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <Lottie src="/lottie/petals.lottie" speed={0.6} className="h-full w-full object-cover opacity-50" />
+      </div>
+      <div className="relative mx-auto grid w-[min(1180px,92%)] items-center gap-10 lg:grid-cols-2">
         <div>
           <Image src="/brand/logo-mark.png" alt="Petal Steps by Thandiwe Mwaba" width={1013} height={552} priority className="h-24 w-auto" />
           <h1 className="font-display mt-5 text-5xl font-semibold leading-[1.05] sm:text-6xl">Women&apos;s heels that <span className="italic text-rose-500">bloom</span> with every step.</h1>

@@ -7,19 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useCart } from "@/context/cart-context";
+import { Lottie } from "@/components/Lottie";
 import { contactConsentGiven } from "@/lib/consent";
 import { money, WA_DISPLAY, waLink, waNumber } from "@/lib/utils";
 
 export function CartDrawer() {
   const { items, open, setOpen, inc, dec, remove, clear, subtotal } = useCart();
   const [form, setForm] = useState({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" });
+  const [sent, setSent] = useState(false);
 
   const checkout = (e: React.FormEvent) => {
     e.preventDefault();
     if (!items.length) return toast.error("Your bag is empty — add a pair first 🌸");
     const lines = items.map((i) => `• ${i.name} — EU ${i.size} × ${i.qty} — ${money(i.price * i.qty)}`).join("\n");
     const msg = `Hi Petal Steps by Thandiwe Mwaba! 🌸 I'd like to order:\n\n${lines}\n\nTotal (delivery/courier separate): ${money(subtotal)}\n\nName: ${form.name}\nNumber: ${form.phone}\nLocation: ${form.location || "—"}\nCourier of choice: ${form.courier}${form.heard ? `\nHeard about you via: ${form.heard}` : ""}\n\nPlease confirm availability before I pay. Thank you!`;
-    toast.success("Order ready! Opening WhatsApp — our only official number…");
+    setSent(true);
     // Fire-and-forget interest log — never blocks or errors the checkout.
     items.forEach((i) =>
       fetch("/api/log-interest", {
@@ -36,19 +38,33 @@ export function CartDrawer() {
         keepalive: true,
       }).catch(() => {})
     );
-    setTimeout(() => window.open(waLink(msg), "_blank"), 900);
-    clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" }); setOpen(false);
+    setTimeout(() => {
+      window.open(waLink(msg), "_blank");
+      clear(); setForm({ name: "", phone: "", location: "", courier: "Collect in store — Thompson Park, Lusaka", heard: "" }); setSent(false); setOpen(false);
+    }, 1600);
   };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent>
+        {sent && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white p-6 text-center">
+            <Lottie src="/lottie/order-sent.lottie" autoplay loop={false} className="h-36 w-36" />
+            <h3 className="font-display text-2xl font-semibold">Order ready!</h3>
+            <p className="text-sm text-stone-500">Opening WhatsApp — our only official number…</p>
+          </div>
+        )}
         <div className="border-b border-rose-100 p-5">
           <SheetTitle>Your bag 🛍️</SheetTitle>
           <SheetDescription>Send your order to our official WhatsApp {WA_DISPLAY}. Confirm availability before payment.</SheetDescription>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
-          {!items.length && <p className="py-10 text-center text-stone-500">Your bag is empty.<br />Add something beautiful 🌸</p>}
+          {!items.length && (
+            <div className="flex flex-col items-center py-8 text-center">
+              <Lottie src="/lottie/empty-bag.lottie" className="h-32 w-32" />
+              <p className="text-stone-500">Your bag is empty.<br />Add something beautiful 🌸</p>
+            </div>
+          )}
           {items.map((i) => (
             <div key={i.key} className="grid grid-cols-[64px_1fr_auto] items-center gap-3">
               <Image src={i.img} alt={i.name} width={128} height={128} className="h-16 w-16 rounded-xl object-cover" />

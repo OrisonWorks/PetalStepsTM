@@ -12,6 +12,7 @@
     "remotion:still": "remotion still src/remotion/index.ts PetalPromo out/petal-promo.png --frame=60"
   },
   "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.21.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
