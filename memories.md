@@ -13,7 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Accessibility & UX audit fixes (PR TBD)
+### 2026-10-30 — Storefront search fixes (PR TBD)
+
+- Search now normalizes both query and catalogue text (case + punctuation folded): "red bottom" matches "Red-Bottom", "nude-pink" = "nude pink". Match text widened from name+colour to name+colour+category+description, so "matte", "slingback", "kitten heel" all work.
+- Typing in the header search scrolls to `#shop` on the first keystroke so results are visible instead of changing off-screen below the hero.
+
+### 2026-10-30 — Accessibility & UX audit fixes (PR #36 + follow-up)
 
 - **Storefront a11y** — product card image/name are real `<button>`s (keyboard + screen-reader accessible); qty −/+ buttons and chat/search inputs get `aria-label`s; checkout form gets labels, `type="tel"` and `autocomplete` on name/phone/location + labelled courier & referral selects; search placeholder no longer mentions hidden SKUs.
 - **Admin a11y** — passcode field gets `aria-label` + `autocomplete="current-password"`; newsletter subject/message and report-date inputs labelled. (Edit/add-style forms already had wrapping labels.)

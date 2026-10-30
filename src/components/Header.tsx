@@ -36,7 +36,21 @@ export function Header({ search, setSearch }: { search: string; setSearch: (v: s
       </nav>
       {showSearch && (
         <div className="mx-auto w-[min(1180px,92%)] pb-3">
-          <Input autoFocus aria-label="Search heels" type="search" placeholder="Search heels by colour or style… e.g. pink, red bottom" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-full" />
+          <Input
+            autoFocus
+            aria-label="Search heels"
+            type="search"
+            placeholder="Search heels by colour or style… e.g. pink, red bottom"
+            value={search}
+            onChange={(e) => {
+              const v = e.target.value;
+              // First keystroke takes you to the results grid so the search
+              // doesn't look dead while the page stays at the hero.
+              if (v && !search) document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" });
+              setSearch(v);
+            }}
+            className="rounded-full"
+          />
         </div>
       )}
     </header>
