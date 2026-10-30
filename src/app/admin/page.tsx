@@ -118,7 +118,7 @@ function downloadCsv(name: string, headers: string[], rows: (string | number)[][
 
 // Daily report as a branded PDF: logo header, KPI line, model table.
 // jsPDF loads lazily so the admin bundle doesn't pay for it on every page.
-async function exportReportPdf(day: string, net: { sold: number; interest: number; restock: number }, modelRows: [string, number, number][]) {
+async function exportReportPdf(day: string, net: { sold: number; interest: number; restock: number }, modelRows: [string, number, number, number][]) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF();
@@ -150,8 +150,8 @@ async function exportReportPdf(day: string, net: { sold: number; interest: numbe
   doc.text(`Pairs sold: ${net.sold}     Order taps: ${net.interest}     Restocks: ${net.restock}`, 14, 36);
   autoTable(doc, {
     startY: 42,
-    head: [["Model", "Sold", "Interest taps"]],
-    body: modelRows.map((r) => [r[0], String(r[1]), String(r[2])]),
+    head: [["Model", "Sold", "Interest taps", "Restocks"]],
+    body: modelRows.map((r) => [r[0], String(r[1]), String(r[2]), String(r[3])]),
     styles: { fontSize: 10 },
     headStyles: { fillColor: [244, 63, 94] },
   });
@@ -295,6 +295,7 @@ function SubscribersPanel() {
 
 function ReportsPanel() {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loadedDay, setLoadedDay] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -310,6 +311,7 @@ function ReportsPanel() {
       }
       setRows(data.rows || []);
       setLoaded(true);
+      setLoadedDay(d);
     } finally {
       setLoading(false);
     }
@@ -324,20 +326,22 @@ function ReportsPanel() {
   const net = { sold: 0, interest: 0, restock: 0 };
   const byModel = new Map<string, number>();
   const interestByModel = new Map<string, number>();
+  const restockByModel = new Map<string, number>();
   netLogRows(rows).forEach(({ r, kind, sign }) => {
     if (kind === "sold" || kind === "restock" || kind === "interest") {
       net[kind as keyof typeof net] += sign;
       if (kind === "sold") byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
       if (kind === "interest") interestByModel.set(r.model, (interestByModel.get(r.model) || 0) + 1);
+      if (kind === "restock") restockByModel.set(r.model, (restockByModel.get(r.model) || 0) + sign);
     }
   });
 
-  const modelRows: [string, number, number][] = Array.from(
-    new Set([...byModel.keys(), ...interestByModel.keys()])
-  ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0]);
+  const modelRows: [string, number, number, number][] = Array.from(
+    new Set([...byModel.keys(), ...interestByModel.keys(), ...restockByModel.keys()])
+  ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0, restockByModel.get(m) || 0]);
   const pg = usePager(modelRows, 15);
   const exportPdf = () => {
-    exportReportPdf(day, net, modelRows).catch(() => toast.error("PDF export failed"));
+    exportReportPdf(loadedDay, net, modelRows).catch(() => toast.error("PDF export failed"));
   };
 
   return (
@@ -360,7 +364,7 @@ function ReportsPanel() {
         {loaded && modelRows.length > 0 && (
           <div className="ml-auto flex gap-2">
             <button
-              onClick={() => downloadCsv(`petal-report-${day}.csv`, ["model", "sold", "interest taps"], modelRows)}
+              onClick={() => downloadCsv(`petal-report-${loadedDay}.csv`, ["model", "sold", "interest taps", "restocks"], modelRows)}
               className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
             >
               CSV / Excel
@@ -396,18 +400,20 @@ function ReportsPanel() {
                 <th className="pb-2">Model</th>
                 <th className="pb-2 text-right">Sold</th>
                 <th className="pb-2 text-right">Interest taps</th>
+                <th className="pb-2 text-right">Restocks</th>
               </tr>
             </thead>
             <tbody>
-              {pg.slice.map(([m, sold, taps]) => (
+              {pg.slice.map(([m, sold, taps, restocks]) => (
                 <tr key={m} className="border-t border-rose-50">
                   <td className="py-2 font-semibold text-stone-700">{m}</td>
                   <td className="py-2 text-right">{sold}</td>
                   <td className="py-2 text-right text-stone-500">{taps}</td>
+                  <td className="py-2 text-right text-stone-500">{restocks}</td>
                 </tr>
               ))}
-              {net.sold === 0 && net.interest === 0 && (
-                <tr><td colSpan={3} className="py-6 text-center text-stone-400">No activity this day</td></tr>
+              {net.sold === 0 && net.interest === 0 && net.restock === 0 && (
+                <tr><td colSpan={4} className="py-6 text-center text-stone-400">No activity this day</td></tr>
               )}
             </tbody>
           </table>
@@ -1916,6 +1922,15 @@ export default function AdminPage() {
   });
   const stockPg = usePager(stockShown, 10);
 
+  // Page/filter changes can unmount an open EditForm — funnel them through
+  // the same discard confirm as closeEditor before they take effect.
+  const goStockPage = async (p: number) => {
+    if (await closeEditor()) stockPg.setPage(p);
+  };
+  const goStockFilter = async (f: typeof stockFilter) => {
+    if (await closeEditor()) setStockFilter(f);
+  };
+
   if (state === "loading") {
     return <main className="mx-auto w-[min(720px,92%)] py-16 text-center text-stone-500">Loading…</main>;
   }
@@ -2031,7 +2046,7 @@ export default function AdminPage() {
           ] as const).map(([f, label]) => (
             <button
               key={f}
-              onClick={() => setStockFilter(f)}
+              onClick={() => void goStockFilter(f)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${stockFilter === f ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}
             >
               {label}
@@ -2109,7 +2124,7 @@ export default function AdminPage() {
             </div>
           </section>
         ))}
-        <Pager page={stockPg.page} pages={stockPg.pages} onPage={stockPg.setPage} />
+        <Pager page={stockPg.page} pages={stockPg.pages} onPage={(p) => void goStockPage(p)} />
       </div>}
       {dialog}
     </main>
