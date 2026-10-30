@@ -779,9 +779,17 @@ function doGet(e) {
         // A sale AFTER the tap counts it as filled — a tap newer than
         // the last sale is still open demand.
         if (lastSold[key] && String(r.ts) <= String(lastSold[key])) return;
-        if (!leads[key]) leads[key] = { model: r.model, size: r.size, taps: 0, lastTs: r.ts };
+        // Contact rides in the note as `· for NAME · tel PHONE` when the
+        // client consented at checkout — the newest tap wins. Rows arrive in
+        // write order, so >= keeps the later row when two taps share a second.
+        if (!leads[key]) leads[key] = { model: r.model, size: r.size, taps: 0, lastTs: "", who: "", phone: "" };
         leads[key].taps++;
-        if (String(r.ts) > String(leads[key].lastTs)) leads[key].lastTs = r.ts;
+        if (String(r.ts) >= String(leads[key].lastTs)) {
+          leads[key].lastTs = r.ts;
+          const who = / · for ([^·]+?) · tel ([^·]+?)\s*(?:·|$)/.exec(String(r.note || ""));
+          leads[key].who = who ? who[1].trim() : "";
+          leads[key].phone = who ? who[2].trim() : "";
+        }
       });
       return out({ ok: true, leads: Object.values(leads) });
     }

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { Product } from "@/lib/products";
 import { totalPairs } from "@/lib/products";
 import { amountInWords } from "@/lib/money-words";
-import { waLink } from "@/lib/utils";
+import { waLink, waNumber } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Pager, usePager } from "@/components/Pager";
@@ -1333,11 +1333,11 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   const tapsArea = new Map<string, number>();
   net.forEach(({ r }) => {
     const note = String(r.note || "");
-    // Notes are built as `qty N · via X · in Y` — each segment stops at the
-    // next `·` so a later segment can't bleed into the earlier capture.
+    // Notes are built as `qty N · via X · in Y [· for NAME · tel PHONE]` — each
+    // segment stops at the next `·` so a later segment can't bleed into the capture.
     const h = /(?:^| · )via ([^·]+?)\s*(?:·|$)/i.exec(note);
     if (h) heardMix.set(h[1].trim(), (heardMix.get(h[1].trim()) || 0) + 1);
-    const loc = / · in ([^·]+?)\s*$/.exec(note);
+    const loc = / · in ([^·]+?)\s*(?:·|$)/.exec(note);
     if (loc) tapsArea.set(loc[1].trim(), (tapsArea.get(loc[1].trim()) || 0) + 1);
   });
   receipts.forEach((r) => {
@@ -1547,7 +1547,7 @@ function RepeatersTable({ repeaters }: { repeaters: [string, { name: string; cou
   );
 }
 
-type Lead = { model: string; size: string; taps: number; lastTs: string };
+type Lead = { model: string; size: string; taps: number; lastTs: string; who?: string; phone?: string };
 
 // Order taps that never became a sale — unfilled demand to follow up on
 // or restock. Matches each lead to its product for name + stock status.
@@ -1607,8 +1607,8 @@ function LeadsPanel({ products }: { products: Product[] }) {
           onClick={() =>
             downloadCsv(
               "leads.csv",
-              ["model", "size", "taps", "last tap"],
-              shown.map((r) => [r.l.model, r.l.size, r.l.taps, r.l.lastTs])
+              ["model", "size", "taps", "last tap", "name", "phone"],
+              shown.map((r) => [r.l.model, r.l.size, r.l.taps, r.l.lastTs, r.l.who || "", r.l.phone || ""])
             )
           }
           disabled={!shown.length}
@@ -1618,7 +1618,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
         </button>
       </div>
       <p className="mt-1 text-xs text-stone-400">
-        A tap counts as filled once the same style+size is later marked sold — these are the open ones.
+        A tap counts as filled once the same style+size is later marked sold — these are the open ones. Contact shown when the client consented to follow-up.
       </p>
       {state === "loading" ? (
         <p className="mt-4 text-sm text-stone-400">Loading…</p>
@@ -1633,7 +1633,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
         <table className="mt-3 w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
-              <th className="pb-1">Style</th><th className="pb-1">Size</th><th className="pb-1 text-right">Taps</th>
+              <th className="pb-1">Style</th><th className="pb-1">Size</th><th className="pb-1">Contact</th><th className="pb-1 text-right">Taps</th>
               <th className="pb-1 text-right">Last tap</th><th className="pb-1 text-right">Stock</th>
             </tr>
           </thead>
@@ -1642,6 +1642,25 @@ function LeadsPanel({ products }: { products: Product[] }) {
               <tr key={`${r.l.model}-${r.l.size}`} className="border-t border-rose-50">
                 <td className="py-1.5 font-semibold text-stone-700">{r.p?.name || r.l.model} <span className="font-normal text-stone-400">{r.l.model}</span></td>
                 <td className="py-1.5 text-stone-500">EU {r.l.size}</td>
+                <td className="py-1.5">
+                  {r.l.phone ? (
+                    <a
+                      className="font-semibold text-emerald-600 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-700"
+                      href={`https://wa.me/${waNumber(r.l.phone)}?text=${encodeURIComponent(
+                        `Hi${r.l.who ? ` ${r.l.who}` : ""}! This is Petal Steps by Thandiwe Mwaba — you asked about the ${r.p?.name || "heels"} in EU ${r.l.size}. ` +
+                        (r.inStock
+                          ? "It's in stock, can I set it aside for you?"
+                          : "It's out of stock right now — should I let you know as soon as it's back?")
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {r.l.who || "Client"} · {r.l.phone}
+                    </a>
+                  ) : (
+                    <span className="text-stone-400">anonymous tap</span>
+                  )}
+                </td>
                 <td className="py-1.5 text-right font-semibold text-rose-500">{r.l.taps}</td>
                 <td className="py-1.5 text-right text-stone-400">{String(r.l.lastTs).slice(0, 10)}</td>
                 <td className="py-1.5 text-right">

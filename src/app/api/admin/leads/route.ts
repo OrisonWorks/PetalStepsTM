@@ -25,11 +25,13 @@ export async function GET() {
       );
     }
     const leads = (Array.isArray(data.leads) ? data.leads : [])
-      .map((r: { model?: unknown; size?: unknown; taps?: unknown; lastTs?: unknown }) => ({
+      .map((r: { model?: unknown; size?: unknown; taps?: unknown; lastTs?: unknown; who?: unknown; phone?: unknown }) => ({
         model: String(r?.model || ""),
         size: String(r?.size || ""),
         taps: parseInt(String(r?.taps), 10) || 0,
         lastTs: String(r?.lastTs || ""),
+        who: String(r?.who || ""),
+        phone: String(r?.phone || ""),
       }))
       .filter((r: { model: string }) => r.model);
     return NextResponse.json({ ok: true, leads });

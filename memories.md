@@ -13,7 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Accessibility & UX audit fixes (PR TBD)
+### 2026-10-30 — Lead contacts + consent banner (PR #39)
+
+- **Consent banner** (`src/components/ConsentBanner.tsx`) — one-time banner until Accept/Decline, stored in localStorage `ps-consent`. Covers saving checkout name/number for order follow-up (the site has no tracking cookies); "No thanks" keeps taps anonymous and ordering still works.
+- **Contact in interest taps** — when consent is given, CartDrawer sends `consent:true` + a structured `contact` field; the server strips any client-written `· for/· tel` from the note and rebuilds the segment itself (appended after `· in AREA`, phone normalized to E.164 via `waNumber`). `kind=leads` returns `who`/`phone` from the newest open tap (first-tap rows included); the admin Leads table shows the contact as a wa.me follow-up link with a stock-aware pre-filled message ("in stock" vs "out of stock — let you know when it's back"), and leads CSV gains name/phone columns. `/api/log-interest` note cap raised to 300 chars. stock_writer.gs needs a new-version redeploy for who/phone to reach admin.
+- **Areas regex** — the Analytics `· in AREA` parser now stops at the next `·` instead of anchoring to end-of-note, so consented taps still count toward taps-by-area.
+
+### 2026-10-30 — Accessibility & UX audit fixes (PRs #36, #37)
 
 - **Storefront a11y** — product card image/name are real `<button>`s (keyboard + screen-reader accessible); qty −/+ buttons and chat/search inputs get `aria-label`s; checkout form gets labels, `type="tel"` and `autocomplete` on name/phone/location + labelled courier & referral selects; search placeholder no longer mentions hidden SKUs.
 - **Admin a11y** — passcode field gets `aria-label` + `autocomplete="current-password"`; newsletter subject/message and report-date inputs labelled. (Edit/add-style forms already had wrapping labels.)
