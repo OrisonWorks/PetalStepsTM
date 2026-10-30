@@ -60,7 +60,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "unknown model" }, { status: 400 });
   }
   const size = Number(body.size);
-  const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
+  // Strip any client-supplied contact segments — callers can't declare another
+  // person's consent by writing `· for … · tel …` into a note. The server
+  // rebuilds the segment only from structured fields when consent is sent.
+  const rawNote = typeof body.note === "string" ? body.note : "";
+  const clean = rawNote.replace(/ · for [^·]* · tel [^·]*?(?= · |$)/g, "").slice(0, 300);
+  let note = clean;
+  const contact = body.contact && typeof body.contact === "object" ? body.contact : null;
+  if (body.consent === true && contact) {
+    const name = String(contact.name || "").replace(/[·\n]/g, ",").trim().slice(0, 40);
+    const phone = String(contact.phone || "").replace(/\D/g, "").slice(0, 15);
+    if (name || phone) note = `${clean} · for ${name} · tel ${phone}`.slice(0, 300);
+  }
   try {
     const res = await fetch(url, {
       method: "POST",

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useCart } from "@/context/cart-context";
 import { contactConsentGiven } from "@/lib/consent";
-import { money, WA_DISPLAY, waLink } from "@/lib/utils";
+import { money, WA_DISPLAY, waLink, waNumber } from "@/lib/utils";
 
 export function CartDrawer() {
   const { items, open, setOpen, inc, dec, remove, clear, subtotal } = useCart();
@@ -28,7 +28,10 @@ export function CartDrawer() {
         body: JSON.stringify({
           model: i.name,
           size: i.size,
-          note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}${contactConsentGiven() && (form.name.trim() || form.phone.trim()) ? ` · for ${form.name.trim().replace(/[·\n]/g, ",").slice(0, 40)} · tel ${form.phone.replace(/[^0-9+]/g, "").slice(0, 20)}` : ""}${form.location.trim() ? ` · in ${form.location.trim().replace(/[·\n]/g, ",").slice(0, 40)}` : ""}`,
+          note: `qty ${i.qty}${form.heard ? ` · via ${form.heard}` : ""}${form.location.trim() ? ` · in ${form.location.trim().replace(/[·\n]/g, ",").slice(0, 40)}` : ""}`,
+          ...(contactConsentGiven() && (form.name.trim() || waNumber(form.phone))
+            ? { consent: true, contact: { name: form.name.trim().slice(0, 40), phone: waNumber(form.phone).slice(0, 15) } }
+            : {}),
         }),
         keepalive: true,
       }).catch(() => {})

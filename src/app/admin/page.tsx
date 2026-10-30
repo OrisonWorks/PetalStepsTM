@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { Product } from "@/lib/products";
 import { totalPairs } from "@/lib/products";
 import { amountInWords } from "@/lib/money-words";
-import { waLink } from "@/lib/utils";
+import { waLink, waNumber } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Pager, usePager } from "@/components/Pager";
@@ -1646,7 +1646,12 @@ function LeadsPanel({ products }: { products: Product[] }) {
                   {r.l.phone ? (
                     <a
                       className="font-semibold text-emerald-600 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-700"
-                      href={`https://wa.me/${r.l.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi${r.l.who ? ` ${r.l.who}` : ""}! This is Petal Steps by Thandiwe Mwaba — you asked about the ${r.p?.name || "heels"} in EU ${r.l.size}. It's in stock, can I set it aside for you?`)}`}
+                      href={`https://wa.me/${waNumber(r.l.phone)}?text=${encodeURIComponent(
+                        `Hi${r.l.who ? ` ${r.l.who}` : ""}! This is Petal Steps by Thandiwe Mwaba — you asked about the ${r.p?.name || "heels"} in EU ${r.l.size}. ` +
+                        (r.inStock
+                          ? "It's in stock, can I set it aside for you?"
+                          : "It's out of stock right now — should I let you know as soon as it's back?")
+                      )}`}
                       target="_blank"
                       rel="noreferrer"
                     >
