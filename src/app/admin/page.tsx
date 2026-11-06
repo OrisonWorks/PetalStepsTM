@@ -64,6 +64,14 @@ function useAnalytics() {
 
 const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 
+// Fire-and-forget audit write — never blocks or errors the caller.
+const audit = (event: string, model: string, note: string) =>
+  fetch("/api/admin/audit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, model, note }),
+  }).catch(() => {});
+
 // Maps a log row to the counter it affects. `undo` rows carry the same
 // "a→b" stock note as the write they reversed, so the direction says which
 // bucket to decrement: next>prev reversed a sale, next<prev a restock.
@@ -214,6 +222,7 @@ function SubscribersPanel() {
         return;
       }
       setSubs((list) => list.map((s) => (s.email === email ? { ...s, status: "stop" } : s)));
+      audit("unsubscribe", "-", email);
       toast.success(`${email} opted out`);
     } catch {
       toast.error("Couldn't mark opt-out — network error");
@@ -493,6 +502,7 @@ function ReceiptPanel({ products }: { products: Product[] }) {
         return;
       }
       setCreated({ no: d.no, key: d.key || "" });
+      audit("receipt", "-", `${d.no} · ${form.client.trim()} · K${amountNum}`);
       toast.success(`Receipt ${d.no} created${d.emailed ? " and emailed" : ""}`);
     } catch {
       toast.error("Receipt failed");
@@ -651,6 +661,7 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
         toast.error(d.error || "Create failed");
         return;
       }
+      audit("create", d.model || form.sku.trim(), `${form.name.trim()} · K${form.price.trim()} · ${pairs} pairs`);
       toast.success(`${form.name} (${d.model}) added — live on the shop in ~a minute`);
       onCreated();
     } catch {
@@ -870,6 +881,7 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       }
       const left = current.filter((i) => !i.error && !i.done).length;
       if (!aborted && failed === 0) {
+        audit("create", "-", `bulk CSV import: ${added} style(s)`);
         toast.success(`${added} styles added — live on the shop in ~a minute`);
         if (left === 0) {
           setItems(null);
@@ -1031,6 +1043,7 @@ function EditForm({
         toast.error(d.error || "Save failed");
         return;
       }
+      audit("edit", product.sku, `${form.name.trim()} · K${price}`);
       onSaved({
         name: form.name.trim(),
         color: form.color.trim(),
@@ -1124,21 +1137,22 @@ function Kpi({ label, value, hint }: { label: string; value: string | number; hi
 function DashboardPanel({ products, analytics, go }: {
   products: Product[];
   analytics: ReturnType<typeof useAnalytics>;
-  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list") => void | Promise<void>;
+  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "activity") => void | Promise<void>;
 }) {
   const { data, loading, reload } = analytics;
   const [days, setDays] = useState(1);
   const from = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10);
   const rangeLabel = days === 1 ? "today" : `last ${days} days`;
   const log = data?.log || [];
-  const receipts = data?.receipts || [];
   const logOk = data ? data.logSupported === true : false;
   const net = netLogRows(log);
   const soldR = net.reduce((a, { r, kind, sign }) => (kind === "sold" && dayOf(r.ts) >= from ? a + sign : a), 0);
   const tapsR = log.filter((r) => r.action === "interest" && dayOf(r.ts) >= from).length;
-  const revR = receipts
-    .filter((r) => dayOf(r.date || "") >= from)
-    .reduce((a, r) => a + (parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0), 0);
+  // Same rule as Analytics: revenue = net pairs sold × list price. Receipts
+  // are optional documents for the same sales — counting both double-counts.
+  const priceBySku = new Map(products.map((p) => [p.sku, p.price]));
+  const revR = net.reduce((a, { r, kind, sign }) =>
+    kind === "sold" && dayOf(r.ts) >= from ? a + sign * (priceBySku.get(r.model) || 0) : a, 0);
   const lowStock = products.filter((p) => totalPairs(p) > 0 && totalPairs(p) <= 5);
   // Dead stock only makes sense when the log read actually succeeded —
   // a failed read would mark every stocked style as dead.
@@ -1161,7 +1175,7 @@ function DashboardPanel({ products, analytics, go }: {
         <Kpi label="Pairs in stock" value={products.reduce((a, p) => a + totalPairs(p), 0)} hint={`${products.length} styles`} />
         <Kpi label={`Pairs sold — ${rangeLabel}`} value={logOk ? soldR : "—"} hint={logOk ? undefined : "log read failed"} />
         <Kpi label={`Order taps — ${rangeLabel}`} value={logOk ? tapsR : "—"} hint={logOk ? "WhatsApp orders opened" : "log read failed"} />
-        <Kpi label={`Revenue — ${rangeLabel}`} value={`K${revR}`} hint={data && !data.receiptsSupported ? "redeploy writer for receipts" : undefined} />
+        <Kpi label={`Est. revenue — ${rangeLabel}`} value={`K${revR.toLocaleString()}`} hint="pairs sold × list price" />
       </div>
       {data && !data.receiptsSupported && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -1216,7 +1230,7 @@ function DashboardPanel({ products, analytics, go }: {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {(["stock", "analytics", "receipts", "add", "list"] as const).map((v) => (
+        {(["stock", "analytics", "receipts", "add", "list", "activity"] as const).map((v) => (
           <button key={v} onClick={() => go(v)} className="rounded-full border border-rose-200 bg-white px-4 py-1.5 text-sm font-semibold text-stone-600 hover:border-rose-400">
             {v === "add" ? "add style" : v === "list" ? "mailing list" : v} →
           </button>
@@ -1260,18 +1274,19 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   const receipts = data.receipts.filter((r) => dayOf(r.date || "") >= from);
   const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
 
+  // Revenue = net pairs sold × list price. Sold log rows carry no amount and
+  // receipts are optional documents for the same sales, so receipts stay out
+  // of this total (they feed payment mix and the paid-receipts count instead).
+  const priceBySku = new Map(products.map((p) => [p.sku, p.price]));
   const perDay = new Map<string, { sold: number; taps: number; rev: number }>();
   net.forEach(({ r, kind, sign }) => {
     const d = dayOf(r.ts);
     const e = perDay.get(d) || { sold: 0, taps: 0, rev: 0 };
-    if (kind === "sold") e.sold += sign;
+    if (kind === "sold") {
+      e.sold += sign;
+      e.rev += sign * (priceBySku.get(r.model) || 0);
+    }
     if (kind === "interest") e.taps += 1;
-    perDay.set(d, e);
-  });
-  receipts.forEach((r) => {
-    const d = dayOf(r.date || "");
-    const e = perDay.get(d) || { sold: 0, taps: 0, rev: 0 };
-    e.rev += parseInt(String(r.amount).replace(/[^0-9]/g, ""), 10) || 0;
     perDay.set(d, e);
   });
   const days = Array.from({ length: range }, (_, i) => {
@@ -1701,6 +1716,111 @@ function LeadsPanel({ products }: { products: Product[] }) {
   );
 }
 
+const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
+  sold: { label: "Sold", cls: "bg-rose-100 text-rose-600" },
+  restock: { label: "Restock", cls: "bg-emerald-100 text-emerald-700" },
+  undo: { label: "Undo", cls: "bg-amber-100 text-amber-700" },
+  interest: { label: "Order tap", cls: "bg-sky-100 text-sky-700" },
+  edit: { label: "Edit", cls: "bg-violet-100 text-violet-700" },
+  create: { label: "New style", cls: "bg-indigo-100 text-indigo-700" },
+  receipt: { label: "Receipt", cls: "bg-teal-100 text-teal-700" },
+  unsubscribe: { label: "Opt-out", cls: "bg-stone-200 text-stone-600" },
+  newsletter: { label: "Newsletter", cls: "bg-rose-100 text-rose-600" },
+};
+
+// Audit trail — every LOG row newest-first: sales, restocks, undos, order
+// taps, and admin writes (edits, new styles, receipts, opt-outs, newsletters).
+function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof useAnalytics>; products: Product[] }) {
+  const { data, loading, reload } = analytics;
+  const [filter, setFilter] = useState<"all" | "stock" | "taps" | "admin">("all");
+  const rows = (data?.log || []).slice().reverse();
+  const groups: Record<typeof filter, (a: string) => boolean> = {
+    all: () => true,
+    stock: (a) => a === "sold" || a === "restock" || a === "undo",
+    taps: (a) => a === "interest",
+    admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter"].includes(a),
+  };
+  const shown = rows.filter((r) => groups[filter](r.action));
+  const pg = usePager(shown, 15);
+  const bySku = new Map(products.map((p) => [p.sku, p]));
+
+  if (loading || !data) {
+    return (
+      <div className="rounded-2xl border border-rose-100 bg-white p-6 text-center">
+        <p className="text-sm text-stone-400">{loading ? "Loading activity…" : "Could not load the log — check the writer deployment."}</p>
+        {!loading && <button onClick={reload} className="mt-3 rounded-lg bg-rose-500 px-4 py-1.5 text-sm font-semibold text-white">Retry</button>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-stone-800">Activity log <span className="font-normal text-stone-400">({shown.length})</span></h2>
+        <button
+          onClick={() => downloadCsv("petal-activity.csv", ["when", "action", "model", "style", "size", "detail"], shown.map((r) => {
+            const p = bySku.get(r.model);
+            return [String(r.ts), r.action, r.model, p ? `${p.name} · ${p.color}` : "", r.size, r.note || ""];
+          }))}
+          className="text-xs font-semibold text-rose-500"
+        >
+          Export CSV
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-stone-400">
+        Everything the sheet has recorded — sales, restocks, undos, order taps, and admin writes (edits, new styles, receipts, opt-outs, newsletters). The last {rows.length} events.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {([
+          ["all", "All"],
+          ["stock", "Stock changes"],
+          ["taps", "Order taps"],
+          ["admin", "Admin actions"],
+        ] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setFilter(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${filter === k ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <p className="mt-4 text-sm text-stone-400">Nothing logged yet — events appear here as they happen.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[640px] mt-3 w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
+                <th className="pb-1">When</th><th className="pb-1">Action</th><th className="pb-1">Style</th>
+                <th className="pb-1">Size</th><th className="pb-1">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pg.slice.map((r, i) => {
+                const p = bySku.get(r.model);
+                const kind = AUDIT_KINDS[r.action];
+                return (
+                  <tr key={`${r.ts}-${i}`} className="border-t border-rose-50">
+                    <td className="py-1.5 pr-3 whitespace-nowrap text-stone-500">{String(r.ts).replace("T", " ").slice(0, 16)}</td>
+                    <td className="py-1.5 pr-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${kind?.cls || "bg-stone-100 text-stone-600"}`}>{kind?.label || r.action}</span>
+                    </td>
+                    <td className="py-1.5 pr-3 font-semibold text-stone-700">
+                      {p ? `${p.name} · ${p.color}` : (r.model === "-" ? "—" : r.model)}
+                      {r.model !== "-" && <span className="block text-xs font-normal text-stone-400">{r.model}</span>}
+                    </td>
+                    <td className="py-1.5 pr-3 text-stone-500">{r.size ? `EU ${r.size}` : "—"}</td>
+                    <td className="py-1.5 text-stone-500">{r.note || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
+    </div>
+  );
+}
+
 // Compose + send a newsletter to every subscriber. The template wraps the
 // message + featured styles in the brand frame; the writer sends via MailApp
 // and reports sent/failed/remaining (Gmail caps ~100 recipients/day).
@@ -1853,7 +1973,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "matte" | "glossy" | "statement" | "red-bottom">("all");
-  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads">("dashboard");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
@@ -2033,7 +2153,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads"] as const).map((v) => (
+        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads", "activity"] as const).map((v) => (
           <button
             key={v}
             onClick={() => goView(v)}
@@ -2076,6 +2196,7 @@ export default function AdminPage() {
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
       {view === "newsletter" && <div className="mt-6"><NewsletterPanel products={products} /></div>}
       {view === "leads" && <div className="mt-6"><LeadsPanel products={products} /></div>}
+      {view === "activity" && <div className="mt-6"><ActivityPanel analytics={analytics} products={products} /></div>}
       {source !== "sheet" && view === "stock" && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           The shop is on the fallback catalogue — stock writes still go to the sheet, but the site
