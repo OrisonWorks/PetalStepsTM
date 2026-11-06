@@ -13,7 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Admin tables scroll on phones (PR TBD)
+### 2026-10-30 — Activity audit tab + revenue fix (PR TBD)
+
+- **New `activity` tab** — renders the LOG sheet newest-first (sales, restocks, undos, order taps + admin writes) with action chips, filter groups (all / stock / taps / admin), pager and CSV export.
+- **Audit writes** — `/api/admin/audit` (cookie-authed) forwards `{event, model, note}` to the writer's `logEvent`; whitelist extended to `edit`, `create`, `receipt`, `unsubscribe` (newsletter already self-logs). Client calls it fire-and-forget after product edits, new style + bulk import, receipt create, subscriber opt-out. **Needs a stock_writer.gs New-version deploy for the new event rows to land.**
+- **Revenue fix** — dashboard KPI + analytics trend/CSV revenue now = net pairs sold × list price (was receipts-only, so it read K0 when sales weren't receipted). Labelled "Est. revenue". Receipts still feed payment mix + paid-receipt count only.
+
+### 2026-10-30 — Admin tables scroll on phones (PR #42)
 
 - All six admin tables (subscribers, daily report, bulk-import preview, top models, repeat customers, leads) wrapped in `overflow-x-auto` with a `min-w-*` so columns stay readable on narrow screens instead of squishing. Stock rows already used flex-wrap and need nothing.
 
