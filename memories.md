@@ -13,7 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Activity audit tab + revenue fix (PR TBD)
+### 2026-10-30 — Review fixes: sale-time prices, server-side audit (PR TBD)
+
+- **Writer stamps sale price** — sold/restock/undo LOG notes now carry `"a→b · K450"` (price read from the sheet row). Revenue uses the stamped price so history survives price edits and fallback-catalogue reads; legacy rows without the suffix fall back to list price. Undo pairing compares only the first note segment. **Needs a stock_writer.gs New-version deploy.**
+- **Audit moved server-side** — `/api/admin/audit` route deleted (an authed caller could forge events); `src/lib/audit.ts` `auditWrite()` is called inside the action routes after success: edit, create (+bulk), receipt, unsubscribe.
+- Dashboard revenue KPI now shows "—" when the log read failed instead of K0.
+
+### 2026-10-30 — Activity audit tab + revenue fix (PR #43)
 
 - **New `activity` tab** — renders the LOG sheet newest-first (sales, restocks, undos, order taps + admin writes) with action chips, filter groups (all / stock / taps / admin), pager and CSV export.
 - **Audit writes** — `/api/admin/audit` (cookie-authed) forwards `{event, model, note}` to the writer's `logEvent`; whitelist extended to `edit`, `create`, `receipt`, `unsubscribe` (newsletter already self-logs). Client calls it fire-and-forget after product edits, new style + bulk import, receipt create, subscriber opt-out. **Needs a stock_writer.gs New-version deploy for the new event rows to land.**

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, cookieAuthed } from "@/lib/admin-auth";
+import { auditWrite } from "@/lib/audit";
 
 // Marks a subscriber STATUS=stop in the sheet (honoring reply-STOP) —
 // suppression, not deletion: the address stays for dedupe and a future
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
     if (!data.ok) {
       return NextResponse.json({ ok: false, error: data.error || "writer error" }, { status: 502 });
     }
+    await auditWrite("unsubscribe", "-", email);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false, error: "writer unreachable" }, { status: 502 });

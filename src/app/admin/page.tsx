@@ -64,14 +64,6 @@ function useAnalytics() {
 
 const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 
-// Fire-and-forget audit write — never blocks or errors the caller.
-const audit = (event: string, model: string, note: string) =>
-  fetch("/api/admin/audit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event, model, note }),
-  }).catch(() => {});
-
 // Maps a log row to the counter it affects. `undo` rows carry the same
 // "a→b" stock note as the write they reversed, so the direction says which
 // bucket to decrement: next>prev reversed a sale, next<prev a restock.
@@ -87,6 +79,14 @@ const countAction = (r: LogRow): { kind: string; sign: number } => {
 // and the mirror-image note — and zeroes BOTH, so the sale is removed from
 // the day it happened (not netted off the undo's day). An undo whose
 // original predates the fetched window keeps its -1 fallback.
+// Price stamped on the log row at sale time ("1→2 · K450") so revenue survives
+// later price edits and fallback-catalogue reads; legacy rows fall back to the
+// current list price.
+const salePrice = (r: LogRow, priceBySku: Map<string, number>) => {
+  const m = /· K(\d+(?:\.\d+)?)/.exec(String(r.note || ""));
+  return m ? parseFloat(m[1]) : priceBySku.get(r.model) || 0;
+};
+
 type NetRow = { r: LogRow; kind: string; sign: number };
 const netLogRows = (rows: LogRow[]): NetRow[] => {
   const out: NetRow[] = rows.map((r) => ({ r, ...countAction(r) }));
@@ -98,7 +98,9 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
     for (let j = i - 1; j >= 0; j--) {
       const o = out[j];
       if (o.sign === 0 || o.r.action !== u.kind) continue;
-      if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) && String(o.r.note) === mirror) {
+      // Compare only the first note segment — newer rows carry a price suffix
+      // ("1→2 · K450") that isn't part of the mirror.
+      if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) && String(o.r.note).split(" · ")[0] === mirror) {
         o.sign = 0;
         u.sign = 0;
         break;
@@ -222,7 +224,6 @@ function SubscribersPanel() {
         return;
       }
       setSubs((list) => list.map((s) => (s.email === email ? { ...s, status: "stop" } : s)));
-      audit("unsubscribe", "-", email);
       toast.success(`${email} opted out`);
     } catch {
       toast.error("Couldn't mark opt-out — network error");
@@ -502,7 +503,6 @@ function ReceiptPanel({ products }: { products: Product[] }) {
         return;
       }
       setCreated({ no: d.no, key: d.key || "" });
-      audit("receipt", "-", `${d.no} · ${form.client.trim()} · K${amountNum}`);
       toast.success(`Receipt ${d.no} created${d.emailed ? " and emailed" : ""}`);
     } catch {
       toast.error("Receipt failed");
@@ -661,7 +661,6 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
         toast.error(d.error || "Create failed");
         return;
       }
-      audit("create", d.model || form.sku.trim(), `${form.name.trim()} · K${form.price.trim()} · ${pairs} pairs`);
       toast.success(`${form.name} (${d.model}) added — live on the shop in ~a minute`);
       onCreated();
     } catch {
@@ -881,7 +880,6 @@ function BulkImport({ onDone }: { onDone: () => void }) {
       }
       const left = current.filter((i) => !i.error && !i.done).length;
       if (!aborted && failed === 0) {
-        audit("create", "-", `bulk CSV import: ${added} style(s)`);
         toast.success(`${added} styles added — live on the shop in ~a minute`);
         if (left === 0) {
           setItems(null);
@@ -1043,7 +1041,6 @@ function EditForm({
         toast.error(d.error || "Save failed");
         return;
       }
-      audit("edit", product.sku, `${form.name.trim()} · K${price}`);
       onSaved({
         name: form.name.trim(),
         color: form.color.trim(),
@@ -1148,11 +1145,11 @@ function DashboardPanel({ products, analytics, go }: {
   const net = netLogRows(log);
   const soldR = net.reduce((a, { r, kind, sign }) => (kind === "sold" && dayOf(r.ts) >= from ? a + sign : a), 0);
   const tapsR = log.filter((r) => r.action === "interest" && dayOf(r.ts) >= from).length;
-  // Same rule as Analytics: revenue = net pairs sold × list price. Receipts
+  // Same rule as Analytics: revenue = net pairs sold × sale price. Receipts
   // are optional documents for the same sales — counting both double-counts.
   const priceBySku = new Map(products.map((p) => [p.sku, p.price]));
   const revR = net.reduce((a, { r, kind, sign }) =>
-    kind === "sold" && dayOf(r.ts) >= from ? a + sign * (priceBySku.get(r.model) || 0) : a, 0);
+    kind === "sold" && dayOf(r.ts) >= from ? a + sign * salePrice(r, priceBySku) : a, 0);
   const lowStock = products.filter((p) => totalPairs(p) > 0 && totalPairs(p) <= 5);
   // Dead stock only makes sense when the log read actually succeeded —
   // a failed read would mark every stocked style as dead.
@@ -1175,7 +1172,7 @@ function DashboardPanel({ products, analytics, go }: {
         <Kpi label="Pairs in stock" value={products.reduce((a, p) => a + totalPairs(p), 0)} hint={`${products.length} styles`} />
         <Kpi label={`Pairs sold — ${rangeLabel}`} value={logOk ? soldR : "—"} hint={logOk ? undefined : "log read failed"} />
         <Kpi label={`Order taps — ${rangeLabel}`} value={logOk ? tapsR : "—"} hint={logOk ? "WhatsApp orders opened" : "log read failed"} />
-        <Kpi label={`Est. revenue — ${rangeLabel}`} value={`K${revR.toLocaleString()}`} hint="pairs sold × list price" />
+        <Kpi label={`Est. revenue — ${rangeLabel}`} value={logOk ? `K${revR.toLocaleString()}` : "—"} hint={logOk ? "pairs sold × sale price" : "log read failed"} />
       </div>
       {data && !data.receiptsSupported && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -1274,9 +1271,9 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
   const receipts = data.receipts.filter((r) => dayOf(r.date || "") >= from);
   const subs = data.subscribers.filter((s) => dayOf(s.ts) >= from);
 
-  // Revenue = net pairs sold × list price. Sold log rows carry no amount and
-  // receipts are optional documents for the same sales, so receipts stay out
-  // of this total (they feed payment mix and the paid-receipts count instead).
+  // Revenue = net pairs sold × sale price (recorded in the log note, else the
+  // current list price). Receipts are optional documents for the same sales,
+  // so they stay out of this total (they feed payment mix + paid count).
   const priceBySku = new Map(products.map((p) => [p.sku, p.price]));
   const perDay = new Map<string, { sold: number; taps: number; rev: number }>();
   net.forEach(({ r, kind, sign }) => {
@@ -1284,7 +1281,7 @@ function AnalyticsPanel({ analytics, products, stockLive }: { analytics: ReturnT
     const e = perDay.get(d) || { sold: 0, taps: 0, rev: 0 };
     if (kind === "sold") {
       e.sold += sign;
-      e.rev += sign * (priceBySku.get(r.model) || 0);
+      e.rev += sign * salePrice(r, priceBySku);
     }
     if (kind === "interest") e.taps += 1;
     perDay.set(d, e);

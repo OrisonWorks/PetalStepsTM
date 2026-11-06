@@ -106,6 +106,7 @@ function doPost(e) {
           ? headers.indexOf("count")
           : headers.indexOf("qty");
       const colorCol = headers.indexOf("color");
+      const priceCol = headers.indexOf("price");
 
       const rowIdxs = [];
       let colIdx = -1;
@@ -168,8 +169,11 @@ function doPost(e) {
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
+      // Stamp the sale-time price into the note so revenue stays correct
+      // after later price edits — "0→1 · K450". Legacy rows lack the suffix
+      // and the app falls back to the current list price.
       appendLog_(body.undo ? "undo" : next < current ? "sold" : "restock", model, size,
-        current + "→" + next);
+        current + "→" + next + priceSuffix_(data[rowIdxs[0]] || [], priceCol));
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
       SpreadsheetApp.flush();
@@ -345,6 +349,13 @@ function getOrCreate_(ss, name, headers) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
+}
+
+// " · K450" when the row carries a positive price — empty otherwise.
+function priceSuffix_(row, priceCol) {
+  if (priceCol < 0) return "";
+  const price = parseFloat(String(row[priceCol] || "").replace(/[^0-9.]/g, ""));
+  return price > 0 ? " · K" + price : "";
 }
 
 // Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE. Never throws — a

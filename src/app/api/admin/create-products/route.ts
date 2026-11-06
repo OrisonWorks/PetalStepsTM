@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { revalidateTag } from "next/cache";
 import { ADMIN_COOKIE, cookieAuthed } from "@/lib/admin-auth";
 import { validateNewProduct, writerCreateProduct } from "@/lib/new-product";
+import { auditWrite } from "@/lib/audit";
 
 const MAX_ITEMS = 200;
 
@@ -44,6 +45,9 @@ export async function POST(req: Request) {
       created++;
     }
   }
-  if (created > 0) revalidateTag("products");
+  if (created > 0) {
+    revalidateTag("products");
+    await auditWrite("create", "-", `bulk CSV import: ${created} style(s)`);
+  }
   return NextResponse.json({ ok: true, created, results });
 }
