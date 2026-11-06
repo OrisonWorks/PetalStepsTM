@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, cookieAuthed } from "@/lib/admin-auth";
+import { auditWrite } from "@/lib/audit";
 
 // Creates a receipt (RECEIPTS tab) and, when `email` is given, mails the
 // client a copy via the Apps Script MailApp action.
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
     }
     const no: string = data.no;
     const key: string = data.key || "";
+    auditWrite("receipt", "-", `${no} · ${client} · K${amount}`);
     const link = `${origin}/receipt/${no}?k=${key}`;
     let emailed = false;
     const email = typeof body.email === "string" ? body.email.trim() : "";

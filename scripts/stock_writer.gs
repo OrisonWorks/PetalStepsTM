@@ -107,6 +107,7 @@ function doPost(e) {
           ? headers.indexOf("count")
           : headers.indexOf("qty");
       const colorCol = headers.indexOf("color");
+      const priceCol = headers.indexOf("price");
 
       const rowIdxs = [];
       let colIdx = -1;
@@ -134,7 +135,8 @@ function doPost(e) {
           newRow[countCol] = applySet;
           newRow[modelCol] = model;
           sheet.appendRow(newRow);
-          appendLog_(body.undo ? "undo" : "restock", model, size, "0→" + applySet);
+          appendLog_(body.undo ? "undo" : "restock", model, size,
+            "0→" + applySet + priceSuffix_(data, modelCol, model, priceCol));
           return out({
             ok: true,
             model,
@@ -169,8 +171,11 @@ function doPost(e) {
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
+      // Stamp the sale-time price into the note so revenue stays correct
+      // after later price edits — "0→1 · K450". Legacy rows lack the suffix
+      // and the app falls back to the current list price.
       appendLog_(body.undo ? "undo" : next < current ? "sold" : "restock", model, size,
-        current + "→" + next);
+        current + "→" + next + priceSuffix_(data, modelCol, model, priceCol));
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
       SpreadsheetApp.flush();
@@ -346,6 +351,20 @@ function getOrCreate_(ss, name, headers) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
+}
+
+// " · K450" when the row carries a positive price — empty otherwise.
+// Price lives on the model's first row in the stock-take layout, so the
+// sale-time price must be read across all of the model's rows — matching
+// how the sheet parser resolves it.
+function priceSuffix_(data, modelCol, model, priceCol) {
+  if (priceCol < 0) return "";
+  for (let i = 1; i < data.length; i++) {
+    if (modelCol >= 0 && String(data[i][modelCol]).trim() !== model) continue;
+    const price = parseFloat(String(data[i][priceCol] || "").replace(/[^0-9.]/g, ""));
+    if (price > 0) return " · K" + price;
+  }
+  return "";
 }
 
 // Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE. Never throws — a

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { revalidateTag } from "next/cache";
 import { ADMIN_COOKIE, cookieAuthed } from "@/lib/admin-auth";
 import { validateNewProduct, writerCreateProduct } from "@/lib/new-product";
+import { auditWrite } from "@/lib/audit";
 
 // Creates a brand-new style: the writer appends one stock-take row per
 // size plus metadata overrides on the first row. The sheet parser then
@@ -27,5 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
   revalidateTag("products");
+  const pairs = product.sizes.reduce((n, s) => n + s.count, 0);
+  auditWrite("create", product.sku, `${product.fields.name} · K${product.fields.price} · ${pairs} pairs`);
   return NextResponse.json({ ok: true, model: product.sku, sizes: product.sizes });
 }

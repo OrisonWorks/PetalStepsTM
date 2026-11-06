@@ -15,10 +15,16 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ### 2026-10-30 — Photo upload in admin (PR #45)
 
-- **Upload product photos** — Add Style and Edit forms get an "Upload image" button beside the photo URL field: file → base64 → `/api/admin/upload-photo` → writer `uploadPhoto` action → a shared `petalsteps-photos` Drive folder (anyone-with-link) → the returned `lh3.googleusercontent.com/d/<id>` URL fills the field. Live thumbnail preview; 5 MB cap; png/jpeg/webp/gif/avif. `next/image` remotePatterns extended to lh3.
+- **Upload product photos** — Add Style and Edit forms get an "Upload image" button beside the photo URL field: file → base64 → `/api/admin/upload-photo` → writer `uploadPhoto` action → a shared `petalsteps-photos` Drive folder (anyone-with-link) → the returned `lh3.googleusercontent.com/d/<id>` URL fills the field. Live thumbnail preview; 3 MB cap (Vercel payload limit); png/jpeg/webp/gif/avif. Save buttons lock while an upload runs. `next/image` remotePatterns extended to lh3.
 - **Deploy note** — the `uploadPhoto` action needs a stock_writer.gs New-version deploy; uploads fail with "writer error" until then.
 
-### 2026-10-30 — Activity audit tab + revenue fix (PR TBD)
+### 2026-10-30 — Review fixes: sale-time prices, server-side audit (PR #44)
+
+- **Writer stamps sale price** — sold/restock/undo LOG notes now carry `"a→b · K450"` (price scanned across all of the model's rows, first nonempty). Revenue uses the stamped price so history survives price edits and fallback-catalogue reads; legacy rows without the suffix fall back to list price. Undo pairing compares only the first note segment. **Needs a stock_writer.gs New-version deploy.**
+- **Audit moved server-side** — `/api/admin/audit` route deleted (an authed caller could forge events); `src/lib/audit.ts` `auditWrite()` runs inside the action routes via `next/server after()` — never blocks the response. Events: edit, create (+bulk), receipt, unsubscribe.
+- Dashboard revenue KPI now shows "—" when the log read failed instead of K0.
+
+### 2026-10-30 — Activity audit tab + revenue fix (PR #43)main
 
 - **New `activity` tab** — renders the LOG sheet newest-first (sales, restocks, undos, order taps + admin writes) with action chips, filter groups (all / stock / taps / admin), pager and CSV export.
 - **Audit writes** — `/api/admin/audit` (cookie-authed) forwards `{event, model, note}` to the writer's `logEvent`; whitelist extended to `edit`, `create`, `receipt`, `unsubscribe` (newsletter already self-logs). Client calls it fire-and-forget after product edits, new style + bulk import, receipt create, subscriber opt-out. **Needs a stock_writer.gs New-version deploy for the new event rows to land.**

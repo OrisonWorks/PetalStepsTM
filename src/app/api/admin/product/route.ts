@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { revalidateTag } from "next/cache";
 import { ADMIN_COOKIE, cookieAuthed } from "@/lib/admin-auth";
+import { auditWrite } from "@/lib/audit";
 
 // Editable product fields → sheet column names the Apps Script writes.
 // The site parser prefers these sheet values over the built-in catalogue.
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
       );
     }
     revalidateTag("products");
+    auditWrite("edit", sku, `${(fields.name || sku).trim()}${fields.price ? ` · K${fields.price.trim()}` : ""}`);
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ ok: false, error: `Stock writer unreachable: ${err}` }, { status: 502 });
