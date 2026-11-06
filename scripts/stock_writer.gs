@@ -82,6 +82,7 @@ function doPost(e) {
       return sendNewsletter(body, out);
     if (body.action === "unsubscribe")
       return unsubscribeEmail(body, out);
+    if (body.action === "uploadPhoto") return uploadPhoto(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -614,6 +615,38 @@ function sendReceiptEmail(body, out) {
 }
 
 // ---------- newsletter ----------
+
+// POST { action: "uploadPhoto", mime, data }
+// Saves a product photo to a shared "petalsteps-photos" Drive folder
+// (anyone-with-link can view) and returns an embeddable URL. `data` is
+// base64, with or without a data: prefix.
+function uploadPhoto(body, out) {
+  const data = String(body.data || "");
+  const mime = String(body.mime || "").trim() || "image/jpeg";
+  if (!/^image\/(png|jpe?g|webp|gif|avif)$/.test(mime))
+    return out({ ok: false, error: "unsupported image type" });
+  const b64 = data.includes(",")
+    ? data.slice(data.indexOf(",") + 1)
+    : data;
+  if (!b64) return out({ ok: false, error: "no image data" });
+  if (b64.length > 8 * 1024 * 1024)
+    return out({ ok: false, error: "image too large" });
+  const ext = mime.split("/")[1].replace("jpeg", "jpg");
+  const name = "product-" + Utilities.getUuid() + "." + ext;
+  const blob = Utilities.newBlob(Utilities.base64Decode(b64), mime, name);
+  const file = photoFolder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return out({
+    ok: true,
+    id: file.getId(),
+    url: "https://lh3.googleusercontent.com/d/" + file.getId(),
+  });
+}
+
+function photoFolder_() {
+  const it = DriveApp.getFoldersByName("petalsteps-photos");
+  return it.hasNext() ? it.next() : DriveApp.createFolder("petalsteps-photos");
+}
 
 // POST { action: "sendNewsletter", subject, html, text? }
 // Sends to every SUBSCRIBERS row. Free Gmail sends ~100 recipients/day —

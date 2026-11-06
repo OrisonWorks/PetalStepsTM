@@ -625,6 +625,83 @@ function ReceiptPanel({ products }: { products: Product[] }) {
 }
 
 
+// Photo field with an optional file upload — the file goes to the shared
+// Drive folder via the stock writer and comes back as a public URL that
+// fills the input. Keeping the text field lets a /products/… path or any
+// URL be used instead.
+function PhotoPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("Pick an image file");
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image too large — keep it under 5 MB");
+    setUploading(true);
+    try {
+      const data = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.onerror = () => rej(new Error("read failed"));
+        r.readAsDataURL(file);
+      });
+      const res = await fetch("/api/admin/upload-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: file.type, data }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok || !d.url) return toast.error(d.error || "Upload failed");
+      onChange(String(d.url));
+      toast.success("Photo uploaded to Drive");
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="sm:col-span-2">
+      <label className="text-xs font-semibold text-stone-500">
+        Photo path / URL
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputCls}
+          placeholder="/products/image1.jpg or https://…"
+        />
+      </label>
+      <div className="mt-2 flex items-center gap-3">
+        <label
+          className={`cursor-pointer rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 ${uploading ? "pointer-events-none opacity-50" : ""}`}
+        >
+          {uploading ? "Uploading…" : "Upload image"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              void pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {value && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt="" className="h-12 w-12 rounded-lg border border-rose-100 object-cover" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AddStylePanel({ onCreated }: { onCreated: () => void }) {
   const { ask, dialog } = useConfirm();
   const [form, setForm] = useState({
@@ -688,7 +765,7 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
           ))}
         </select>
       </label>
-      <label className="text-xs font-semibold text-stone-500">Photo path / URL<input value={form.img} onChange={set("img")} className={inputCls} placeholder="/products/image1.jpg or https://…" /></label>
+      <PhotoPicker value={form.img} onChange={(url) => setForm({ ...form, img: url })} />
       <label className="text-xs font-semibold text-stone-500 sm:col-span-2">Description<textarea value={form.desc} onChange={set("desc")} rows={2} className={inputCls} placeholder="Optional — shown on the product card" /></label>
       <div className="sm:col-span-2">
         <p className="mb-2 text-xs font-semibold text-stone-500">Starting stock per size</p>
@@ -1095,10 +1172,7 @@ function EditForm({
           ))}
         </select>
       </label>
-      <label className="text-xs font-semibold text-stone-500 sm:col-span-2">
-        Photo (URL or /products/… path)
-        <input value={form.img} onChange={set("img")} className={input} />
-      </label>
+      <PhotoPicker value={form.img} onChange={(url) => setForm({ ...form, img: url })} />
       <label className="text-xs font-semibold text-stone-500 sm:col-span-2">
         Description
         <textarea value={form.desc} onChange={set("desc")} rows={2} className={input} />
