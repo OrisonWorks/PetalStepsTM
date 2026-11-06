@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     }
     const no: string = data.no;
     const key: string = data.key || "";
-    await auditWrite("receipt", "-", `${no} · ${client} · K${amount}`);
+    auditWrite("receipt", "-", `${no} · ${client} · K${amount}`);
     const link = `${origin}/receipt/${no}?k=${key}`;
     let emailed = false;
     const email = typeof body.email === "string" ? body.email.trim() : "";

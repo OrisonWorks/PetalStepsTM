@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   }
   if (created > 0) {
     revalidateTag("products");
-    await auditWrite("create", "-", `bulk CSV import: ${created} style(s)`);
+    auditWrite("create", "-", `bulk CSV import: ${created} style(s)`);
   }
   return NextResponse.json({ ok: true, created, results });
 }

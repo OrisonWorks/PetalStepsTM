@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       );
     }
     revalidateTag("products");
-    await auditWrite("edit", sku, `${(fields.name || sku).trim()}${fields.price ? ` · K${fields.price.trim()}` : ""}`);
+    auditWrite("edit", sku, `${(fields.name || sku).trim()}${fields.price ? ` · K${fields.price.trim()}` : ""}`);
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ ok: false, error: `Stock writer unreachable: ${err}` }, { status: 502 });

@@ -134,7 +134,8 @@ function doPost(e) {
           newRow[countCol] = applySet;
           newRow[modelCol] = model;
           sheet.appendRow(newRow);
-          appendLog_(body.undo ? "undo" : "restock", model, size, "0→" + applySet);
+          appendLog_(body.undo ? "undo" : "restock", model, size,
+            "0→" + applySet + priceSuffix_(data, modelCol, model, priceCol));
           return out({
             ok: true,
             model,
@@ -173,7 +174,7 @@ function doPost(e) {
       // after later price edits — "0→1 · K450". Legacy rows lack the suffix
       // and the app falls back to the current list price.
       appendLog_(body.undo ? "undo" : next < current ? "sold" : "restock", model, size,
-        current + "→" + next + priceSuffix_(data[rowIdxs[0]] || [], priceCol));
+        current + "→" + next + priceSuffix_(data, modelCol, model, priceCol));
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
       SpreadsheetApp.flush();
@@ -352,10 +353,17 @@ function getOrCreate_(ss, name, headers) {
 }
 
 // " · K450" when the row carries a positive price — empty otherwise.
-function priceSuffix_(row, priceCol) {
+// Price lives on the model's first row in the stock-take layout, so the
+// sale-time price must be read across all of the model's rows — matching
+// how the sheet parser resolves it.
+function priceSuffix_(data, modelCol, model, priceCol) {
   if (priceCol < 0) return "";
-  const price = parseFloat(String(row[priceCol] || "").replace(/[^0-9.]/g, ""));
-  return price > 0 ? " · K" + price : "";
+  for (let i = 1; i < data.length; i++) {
+    if (modelCol >= 0 && String(data[i][modelCol]).trim() !== model) continue;
+    const price = parseFloat(String(data[i][priceCol] || "").replace(/[^0-9.]/g, ""));
+    if (price > 0) return " · K" + price;
+  }
+  return "";
 }
 
 // Appends one LOG row: TS, ACTION, MODEL, SIZE, NOTE. Never throws — a

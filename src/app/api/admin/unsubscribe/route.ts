@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     if (!data.ok) {
       return NextResponse.json({ ok: false, error: data.error || "writer error" }, { status: 502 });
     }
-    await auditWrite("unsubscribe", "-", email);
+    auditWrite("unsubscribe", "-", email);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false, error: "writer unreachable" }, { status: 502 });

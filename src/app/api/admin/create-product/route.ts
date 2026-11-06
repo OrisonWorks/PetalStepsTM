@@ -29,6 +29,6 @@ export async function POST(req: Request) {
   }
   revalidateTag("products");
   const pairs = product.sizes.reduce((n, s) => n + s.count, 0);
-  await auditWrite("create", product.sku, `${product.fields.name} · K${product.fields.price} · ${pairs} pairs`);
+  auditWrite("create", product.sku, `${product.fields.name} · K${product.fields.price} · ${pairs} pairs`);
   return NextResponse.json({ ok: true, model: product.sku, sizes: product.sizes });
 }
