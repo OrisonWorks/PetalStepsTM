@@ -632,17 +632,24 @@ function ReceiptPanel({ products }: { products: Product[] }) {
 function PhotoPicker({
   value,
   onChange,
+  onUploading,
 }: {
   value: string;
   onChange: (url: string) => void;
+  onUploading?: (busy: boolean) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const setBusy = (v: boolean) => {
+    setUploading(v);
+    onUploading?.(v);
+  };
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("Pick an image file");
-    if (file.size > 5 * 1024 * 1024) return toast.error("Image too large — keep it under 5 MB");
-    setUploading(true);
+    // Base64 adds ~37% — 3 MB binary stays under Vercel's 4.5 MB function payload limit.
+    if (file.size > 3 * 1024 * 1024) return toast.error("Image too large — keep it under 3 MB");
+    setBusy(true);
     try {
       const data = await new Promise<string>((res, rej) => {
         const r = new FileReader();
@@ -662,7 +669,7 @@ function PhotoPicker({
     } catch {
       toast.error("Upload failed");
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   };
 
@@ -715,6 +722,7 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
   });
   const [counts, setCounts] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -765,7 +773,11 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
           ))}
         </select>
       </label>
-      <PhotoPicker value={form.img} onChange={(url) => setForm({ ...form, img: url })} />
+      <PhotoPicker
+        value={form.img}
+        onChange={(url) => setForm((f) => ({ ...f, img: url }))}
+        onUploading={setPhotoUploading}
+      />
       <label className="text-xs font-semibold text-stone-500 sm:col-span-2">Description<textarea value={form.desc} onChange={set("desc")} rows={2} className={inputCls} placeholder="Optional — shown on the product card" /></label>
       <div className="sm:col-span-2">
         <p className="mb-2 text-xs font-semibold text-stone-500">Starting stock per size</p>
@@ -784,8 +796,8 @@ function AddStylePanel({ onCreated }: { onCreated: () => void }) {
           ))}
         </div>
       </div>
-      <button disabled={saving} className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50 sm:col-span-2">
-        {saving ? "Adding…" : "Add style"}
+      <button disabled={saving || photoUploading} className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50 sm:col-span-2">
+        {saving ? "Adding…" : photoUploading ? "Photo uploading…" : "Add style"}
       </button>
       {dialog}
     </form>
@@ -1084,6 +1096,7 @@ function EditForm({
     desc: product.desc,
   });
   const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -1172,17 +1185,21 @@ function EditForm({
           ))}
         </select>
       </label>
-      <PhotoPicker value={form.img} onChange={(url) => setForm({ ...form, img: url })} />
+      <PhotoPicker
+        value={form.img}
+        onChange={(url) => setForm((f) => ({ ...f, img: url }))}
+        onUploading={setPhotoUploading}
+      />
       <label className="text-xs font-semibold text-stone-500 sm:col-span-2">
         Description
         <textarea value={form.desc} onChange={set("desc")} rows={2} className={input} />
       </label>
       <div className="flex gap-2 sm:col-span-2">
         <button
-          disabled={saving}
+          disabled={saving || photoUploading}
           className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-40"
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : photoUploading ? "Photo uploading…" : "Save"}
         </button>
         <button
           type="button"

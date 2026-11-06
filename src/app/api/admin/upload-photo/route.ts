@@ -26,8 +26,9 @@ export async function POST(req: Request) {
   if (!/^image\/(png|jpe?g|webp|gif|avif)$/.test(mime)) {
     return NextResponse.json({ ok: false, error: "unsupported image type" }, { status: 400 });
   }
-  // ~6 MB binary ≈ 8 MB base64 — the client caps at 5 MB.
-  if (data.length > 8 * 1024 * 1024) {
+  // 3 MB binary ≈ 4 MB base64 — stays under Vercel's 4.5 MB function
+  // payload limit (the client caps at 3 MB).
+  if (data.length > 4.5 * 1024 * 1024) {
     return NextResponse.json({ ok: false, error: "image too large" }, { status: 400 });
   }
   try {
