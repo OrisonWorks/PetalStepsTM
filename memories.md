@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Photo upload in admin (PR TBD)
+### 2026-10-30 — Photo upload in admin (PR #45)
 
 - **Upload product photos** — Add Style and Edit forms get an "Upload image" button beside the photo URL field: file → base64 → `/api/admin/upload-photo` → writer `uploadPhoto` action → a shared `petalsteps-photos` Drive folder (anyone-with-link) → the returned `lh3.googleusercontent.com/d/<id>` URL fills the field. Live thumbnail preview; 5 MB cap; png/jpeg/webp/gif/avif. `next/image` remotePatterns extended to lh3.
 - **Deploy note** — the `uploadPhoto` action needs a stock_writer.gs New-version deploy; uploads fail with "writer error" until then.
