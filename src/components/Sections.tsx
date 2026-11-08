@@ -170,9 +170,6 @@ export function Contact() {
             <li className="flex items-center gap-2"><Clock className="h-5 w-5 text-rose-500" /> Yango booking: Mon–Fri 10:00–16:00 · Sat 09:00–13:00 · Sun closed</li>
             <li className="flex items-center gap-2"><Truck className="h-5 w-5 text-rose-500" /> Pick up within 5 days, or K5/day storage applies</li>
           </ul>
-          <div className="mt-6 grid grid-cols-3 gap-2">
-            <PolicyCards />
-          </div>
         </div>
         <form onSubmit={submit} className="space-y-3 rounded-3xl border border-rose-100 bg-white p-6 shadow-xl shadow-rose-500/10">
           <label className="block text-sm font-semibold">Your name<Input required autoComplete="name" placeholder="e.g. Tumelo M." className="mt-1" /></label>
