@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Remove duplicated policy cards (PR TBD)
+### 2026-10-30 — Remove duplicated policy cards (PR #46)
 
 - The three printed policy cards (order & payment, Lusaka delivery, out-of-town delivery) rendered twice on the storefront — under FAQs (their contextual home, with "tap the policy cards" copy) and again inside the Contact section. Dropped the Contact copy.
 
