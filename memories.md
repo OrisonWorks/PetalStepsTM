@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Remove duplicated policy cards (PR TBD)
+
+- The three printed policy cards (order & payment, Lusaka delivery, out-of-town delivery) rendered twice on the storefront — under FAQs (their contextual home, with "tap the policy cards" copy) and again inside the Contact section. Dropped the Contact copy.
+
 ### 2026-10-30 — Photo upload in admin (PR #45)
 
 - **Upload product photos** — Add Style and Edit forms get an "Upload image" button beside the photo URL field: file → base64 → `/api/admin/upload-photo` → writer `uploadPhoto` action → a shared `petalsteps-photos` Drive folder (anyone-with-link) → the returned `lh3.googleusercontent.com/d/<id>` URL fills the field. Live thumbnail preview; 3 MB cap (Vercel payload limit); png/jpeg/webp/gif/avif. Save buttons lock while an upload runs. `next/image` remotePatterns extended to lh3.
