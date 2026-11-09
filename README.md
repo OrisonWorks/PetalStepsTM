@@ -88,9 +88,21 @@ Two scheduled functions live in `stock_writer.gs`. Install them once:
 
 1. Apps Script → **Triggers (⏰ clock icon, left rail)** → **+ Add Trigger**:
    - `dailyDigest` → event source **Time-driven** → **Day timer** → pick an evening slot (e.g. 21:00–22:00). Emails the day's sold/restock/interest counts and receipt revenue.
+
+   Easier: run `installTriggers()` once from the editor — it (re)creates `dailyDigest` (daily ~21:00), `weeklyDigest` (Sunday ~20:00), `monthlyDigest` (1st ~08:00) and `backupSheet` (Sunday ~06:00).
    - `backupSheet` → **Time-driven** → **Week timer** (or Day timer for daily backups) → pick a time. Emails every tab as CSV attachments.
 2. Both email the address in Script Property `REPORT_EMAIL` if set, otherwise the script owner's Gmail. Add `REPORT_EMAIL` under Script Properties to override.
 3. First run asks for Gmail/send-mail authorization — approve once.
+
+### WhatsApp Cloud API (optional upgrade)
+
+Admin "text customer" buttons work today via wa.me links (they open your own WhatsApp). To send directly from the app — and to log inbound customer messages into the Activity tab — wire up Meta's WhatsApp Cloud API:
+
+1. Meta for Developers → your app → WhatsApp → API Setup: get the **Phone number ID** and create a **permanent system-user access token** with `whatsapp_business_messaging`.
+2. Set Vercel env vars: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` (any random string you invent).
+3. Meta → WhatsApp → Configuration → Webhook: URL `https://<site>/api/whatsapp/webhook`, verify token = `WHATSAPP_VERIFY_TOKEN`, subscribe to **messages**.
+
+Until then `/api/admin/send-update` returns a wa.me link and the admin UI opens your WhatsApp — zero behavior change. Note Meta only delivers free-form text within 24h of the customer's last message; outside that window an approved template is required (`waSendTemplate` is already in `src/lib/whatsapp.ts`).
 
 > Apps Script web apps serve the deployed version, not the latest saved code. After updating `stock_writer.gs` you must redeploy: **Deploy → Manage deployments → ✎ → Version: New version → Deploy**. The `/exec` URL stays the same.
 
