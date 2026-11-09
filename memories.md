@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Lookbook, size guide, social links (PR TBD)
+### 2026-10-30 — Lookbook, size guide, social links (PR #47)
 
 - New `Lookbook` section between Why Us and FAQs: 6-shot editorial grid (flatlay + category photos) with a lightbox dialog; header nav gains a "Lookbook" link.
 - New `SizeGuide` component: EU 35–45 → UK/US/foot-cm conversion dialog, triggered from the shop "My size" strip and the footer Help column.
