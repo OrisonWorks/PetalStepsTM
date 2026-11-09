@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR TBD)
+### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
 
 - `/api/admin/report` takes `period=day|week|month`; week = the ISO Mon–Sun containing `day`, month = its calendar month. Period ranges pull `n=5000` and filter locally.
 - Reports tab renamed "Sales report": Day/Week/Month toggle, a fourth "est. revenue" KPI card (net sold × `salePrice`), and a per-model Revenue column (in the CSV export too).
