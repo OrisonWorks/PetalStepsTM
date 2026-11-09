@@ -20,6 +20,14 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Writer gains `weeklyDigest()` (Sunday ~20:00, last 7 days) and `monthlyDigest()` (1st ~08:00, previous calendar month) — sold per model with `· K` stamp revenue, undo count, receipts total, taps. Both registered by `installTriggers()` — rerun it after deploying the new writer version.
 - Dead-stock + low-stock alert cards already live on the dashboard (PR #29 era) — not re-added here.
 
+### 2026-10-30 — WhatsApp Cloud API plumbing, env-gated (PR #50)
+
+- `src/lib/whatsapp.ts`: `waCloudConfigured()`, `waSendText`, `waSendTemplate` over Meta Graph v21.0 — all no-op until `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` exist.
+- `/api/admin/send-update` (POST, authed): sends via Cloud API when configured; on any failure or missing config returns `{mode:"link", link}` so the caller opens wa.me — one button covers both worlds.
+- `/api/whatsapp/webhook`: GET verifies Meta's handshake via `WHATSAPP_VERIFY_TOKEN`; POST logs inbound customer texts as `whatsapp` LOG events (new whitelisted event in `logEvent`) → visible in Activity under Admin actions.
+- Leads tab contact cells now call send-update instead of a raw wa.me href — identical UX until Meta is wired, then it sends in-app.
+- Env vars documented in `.env.example` + README; free-form text only delivers inside Meta's 24h window, templates beyond it.
+
 ### 2026-10-30 — Remove duplicated policy cards (PR #46)
 
 - The three printed policy cards (order & payment, Lusaka delivery, out-of-town delivery) rendered twice on the storefront — under FAQs (their contextual home, with "tap the policy cards" copy) and again inside the Contact section. Dropped the Contact copy.

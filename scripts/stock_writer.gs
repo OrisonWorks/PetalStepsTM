@@ -439,7 +439,7 @@ function sheetRows_(ss, name) {
 function logEvent(body, out) {
   const event = String(body.event || "").trim();
   const model = String(body.model || "").trim();
-  if (!["interest", "sold", "restock", "edit", "create", "receipt", "unsubscribe"].includes(event))
+  if (!["interest", "sold", "restock", "edit", "create", "receipt", "unsubscribe", "whatsapp"].includes(event))
     return out({ ok: false, error: "unknown event" });
   if (!model) return out({ ok: false, error: "model required" });
   const lock = LockService.getScriptLock();

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { Product } from "@/lib/products";
 import { totalPairs } from "@/lib/products";
 import { amountInWords } from "@/lib/money-words";
-import { waLink, waNumber } from "@/lib/utils";
+import { waLink } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Pager, usePager } from "@/components/Pager";
@@ -1733,6 +1733,35 @@ function LeadsPanel({ products }: { products: Product[] }) {
   const shown = rows.filter((r) => (show === "all" ? true : show === "stocked" ? r.inStock : !r.inStock));
   const pg = usePager(shown, 15);
 
+  // Goes through /api/admin/send-update: Cloud API send when Meta is wired
+  // up, else the same message opens in your own WhatsApp.
+  const textLead = async (r: { l: Lead; p?: Product; inStock: boolean }) => {
+    const message =
+      `Hi${r.l.who ? ` ${r.l.who}` : ""}! This is Petal Steps by Thandiwe Mwaba — you asked about the ${r.p?.name || "heels"} in EU ${r.l.size}. ` +
+      (r.inStock
+        ? "It's in stock, can I set it aside for you?"
+        : "It's out of stock right now — should I let you know as soon as it's back?");
+    try {
+      const res = await fetch("/api/admin/send-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: r.l.phone, message }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Couldn't send");
+        return;
+      }
+      if (d.mode === "sent") toast.success(`Sent to ${r.l.who || r.l.phone} via WhatsApp`);
+      else {
+        if (d.warn) toast.info(`WhatsApp API: ${d.warn} — opening your WhatsApp instead`);
+        window.open(d.link, "_blank");
+      }
+    } catch {
+      toast.error("Couldn't send");
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -1793,19 +1822,14 @@ function LeadsPanel({ products }: { products: Product[] }) {
                 <td className="py-1.5 text-stone-500">EU {r.l.size}</td>
                 <td className="py-1.5">
                   {r.l.phone ? (
-                    <a
+                    <button
+                      type="button"
+                      title="Message them — sends via the WhatsApp Cloud API once configured, otherwise opens your WhatsApp"
                       className="font-semibold text-emerald-600 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-700"
-                      href={`https://wa.me/${waNumber(r.l.phone)}?text=${encodeURIComponent(
-                        `Hi${r.l.who ? ` ${r.l.who}` : ""}! This is Petal Steps by Thandiwe Mwaba — you asked about the ${r.p?.name || "heels"} in EU ${r.l.size}. ` +
-                        (r.inStock
-                          ? "It's in stock, can I set it aside for you?"
-                          : "It's out of stock right now — should I let you know as soon as it's back?")
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
+                      onClick={() => void textLead(r)}
                     >
                       {r.l.who || "Client"} · {r.l.phone}
-                    </a>
+                    </button>
                   ) : (
                     <span className="text-stone-400">anonymous tap</span>
                   )}
@@ -1838,6 +1862,7 @@ const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
   receipt: { label: "Receipt", cls: "bg-teal-100 text-teal-700" },
   unsubscribe: { label: "Opt-out", cls: "bg-stone-200 text-stone-600" },
   newsletter: { label: "Newsletter", cls: "bg-rose-100 text-rose-600" },
+  whatsapp: { label: "WhatsApp in", cls: "bg-emerald-100 text-emerald-700" },
 };
 
 // Audit trail — every LOG row newest-first: sales, restocks, undos, order
@@ -1850,7 +1875,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
     all: () => true,
     stock: (a) => a === "sold" || a === "restock" || a === "undo",
     taps: (a) => a === "interest",
-    admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter"].includes(a),
+    admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter", "whatsapp"].includes(a),
   };
   const shown = rows.filter((r) => groups[filter](r.action));
   const pg = usePager(shown, 15);
