@@ -760,10 +760,17 @@ function doGet(e) {
     if (kind === "log") {
       const n = Math.min(5000, parseInt(p.n || "300", 10) || 300);
       const day = String(p.day || "");
-      // Filter by day BEFORE the row cap so older days don't fall off the
-      // tail of the log.
+      const from = String(p.from || "");
+      const to = String(p.to || "");
+      // Filter by day/range BEFORE the row cap so older events don't fall
+      // off the tail of the log.
       let rows = sheetRows_(ss, "LOG");
       if (day) rows = rows.filter((r) => String(r.ts).indexOf(day) === 0);
+      else if (from || to)
+        rows = rows.filter((r) => {
+          const d = String(r.ts).slice(0, 10);
+          return (!from || d >= from) && (!to || d <= to);
+        });
       return out({ ok: true, rows: rows.slice(-n) });
     }
     if (kind === "receipt") {
@@ -925,24 +932,57 @@ function monthlyDigest() {
 }
 
 function sendRollup_(ss, fromDay, toDay, subject) {
-  const rows = sheetRows_(ss, "LOG").filter((r) => {
+  const log = sheetRows_(ss, "LOG");
+  // Pair each undo with the write it reversed (same model+size, mirror
+  // a→b note — compare only the segment before the `· K<price>` stamp)
+  // and drop both, exactly like the admin UI's netLogRows. Pairing runs
+  // over the WHOLE log so an undo inside the window can cancel a sale
+  // from before it.
+  const dead = new Array(log.length).fill(false);
+  for (let i = log.length - 1; i >= 0; i--) {
+    const u = log[i];
+    if (u.action !== "undo") continue;
+    const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
+    if (m.length !== 2 || m.some((x) => isNaN(x))) continue;
+    const kind = m[1] > m[0] ? "sold" : "restock";
+    const mirror = m[1] + "→" + m[0];
+    for (let j = i - 1; j >= 0; j--) {
+      const o = log[j];
+      if (dead[j] || o.action !== kind) continue;
+      if (
+        o.model === u.model &&
+        String(o.size) === String(u.size) &&
+        String(o.note || "").split(" · ")[0] === mirror
+      ) {
+        dead[j] = true;
+        dead[i] = true;
+        break;
+      }
+    }
+  }
+  const inRange = (r) => {
     const d = String(r.ts).slice(0, 10);
     return d >= fromDay && d <= toDay;
-  });
+  };
+  const rawRange = log.filter(inRange);
+  const rows = log.filter((r, i) => !dead[i] && inRange(r));
   const sales = rows.filter((r) => r.action === "sold");
   const interest = rows.filter((r) => r.action === "interest");
-  const undos = rows.filter((r) => r.action === "undo");
+  const undos = rawRange.filter((r) => r.action === "undo");
   const receipts = sheetRows_(ss, "RECEIPTS").filter((r) => {
     const d = String(r.date).slice(0, 10);
     return d >= fromDay && d <= toDay;
   });
+  const prices = priceByModel_(ss);
   const perModel = {};
   const revPerModel = {};
   let revenue = 0;
   sales.forEach((r) => {
     perModel[r.model] = (perModel[r.model] || 0) + 1;
     const m = /·\s*K(\d+(?:\.\d+)?)/.exec(String(r.note || ""));
-    const rev = m ? parseFloat(m[1]) : 0;
+    // Unstamped rows (logged before the price stamp existed) fall back to
+    // the model's current list price, same as the admin dashboards.
+    const rev = m ? parseFloat(m[1]) : prices[r.model] || 0;
     revenue += rev;
     revPerModel[r.model] = (revPerModel[r.model] || 0) + rev;
   });
@@ -967,6 +1007,36 @@ function sendRollup_(ss, fromDay, toDay, subject) {
     "\nInterest taps on WhatsApp order: " + interest.length +
     "\n\n— Petal Steps shop";
   MailApp.sendEmail(reportEmail_(), "Petal Steps — " + subject, text);
+}
+
+// model → current PRICE, read off the products sheet (first sheet) with
+// the same header resolution the write path uses. Backs the rollup
+// fallback for sale rows that predate the `· K<price>` note stamp.
+function priceByModel_(ss) {
+  const map = {};
+  try {
+    const data = ss.getSheets()[0].getDataRange().getValues();
+    const headers = data[0].map((h) =>
+      String(h).trim().toLowerCase().replace(/\s+/g, "_")
+    );
+    const modelCol =
+      headers.indexOf("model") >= 0
+        ? headers.indexOf("model")
+        : headers.indexOf("sku");
+    const priceCol = headers.indexOf("price");
+    if (modelCol < 0 || priceCol < 0) return map;
+    for (let i = 1; i < data.length; i++) {
+      const m = String(data[i][modelCol]).trim();
+      if (!m || map[m]) continue;
+      const p = parseFloat(
+        String(data[i][priceCol] || "").replace(/[^0-9.]/g, "")
+      );
+      if (p > 0) map[m] = p;
+    }
+  } catch (e) {
+    /* revenue fallback just reports K0 if the sheet can't be read */
+  }
+  return map;
 }
 
 // Emails every tab as CSV attachments. Daily or weekly trigger.

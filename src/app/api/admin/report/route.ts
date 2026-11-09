@@ -33,10 +33,15 @@ export async function GET(req: Request) {
     to = day.slice(0, 8) + "31";
   }
 
-  // The day filter runs inside the writer so the row cap can't drop an
-  // older day's events behind newer ones; period ranges filter locally.
+  // The day/from/to filters run inside the writer so the row cap can't
+  // drop an older window's events behind newer ones; the local filter
+  // below stays for a writer deployed before from/to existed.
   const qs = new URLSearchParams({ token, kind: "log", n: period === "day" ? "800" : "5000" });
   if (period === "day" && day) qs.set("day", day);
+  else if (period !== "day" && from) {
+    qs.set("from", from);
+    qs.set("to", to);
+  }
   try {
     const res = await fetch(`${base}?${qs}`, { cache: "no-store" });
     const data = await res.json().catch(() => ({}));
