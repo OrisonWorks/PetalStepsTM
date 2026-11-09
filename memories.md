@@ -20,6 +20,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Writer gains `weeklyDigest()` (Sunday ~20:00, last 7 days) and `monthlyDigest()` (1st ~08:00, previous calendar month) — sold per model with `· K` stamp revenue, undo count, receipts total, taps. Both registered by `installTriggers()` — rerun it after deploying the new writer version.
 - Dead-stock + low-stock alert cards already live on the dashboard (PR #29 era) — not re-added here.
 
+### 2026-10-30 — Lookbook, size guide, social links (PR #47)
+
+- New `Lookbook` section between Why Us and FAQs: 6-shot editorial grid (flatlay + category photos) with a lightbox dialog; header nav gains a "Lookbook" link.
+- New `SizeGuide` component: EU 35–45 → UK/US/foot-cm conversion dialog, triggered from the shop "My size" strip and the footer Help column.
+- `IG_URL`/`TIKTOK_URL` constants in `src/lib/utils.ts` (empty until handles exist); the footer renders Instagram/TikTok links only when set.
+
 ### 2026-10-30 — Admin hide/publish styles (PR #48)
 
 - The sheet `ACTIVE` column already hid a style from the storefront but admin could never see it — the parser dropped hidden rows even for `?all=1`. Now `getProducts(includeEmpty=true)` returns them with `hidden: true` on `Product`; the public path is unchanged.

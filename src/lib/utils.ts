@@ -8,6 +8,9 @@ export function cn(...inputs: ClassValue[]) {
 export const money = (n: number) => "K" + n.toLocaleString("en-ZM");
 export const FB_URL =
   "https://www.facebook.com/p/Petal-Steps-by-TM-61586015481553/";
+// Empty until the handles exist — anything that renders these checks for a value.
+export const IG_URL = "";
+export const TIKTOK_URL = "";
 export const WA_NUMBER = "260760732751";
 export const WA_DISPLAY = "+260 760 732 751";
 export const waLink = (text: string) =>

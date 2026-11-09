@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductCard } from "@/components/ProductCard";
+import { SizeGuide } from "@/components/Sections";
 import { type ClientProduct, type Filter } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ export function Shop({ products, filter, setFilter, search, sort, setSort, onQui
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-xs font-bold uppercase tracking-wider text-stone-400">My size</span>
+          <SizeGuide />
           {EU_SIZES.map((s) => (
             <button
               key={s}
