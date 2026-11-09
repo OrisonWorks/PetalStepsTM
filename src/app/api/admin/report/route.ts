@@ -14,11 +14,34 @@ export async function GET(req: Request) {
   if (!base || !token) {
     return NextResponse.json({ ok: false, error: "Stock writer not configured" }, { status: 503 });
   }
-  const day = new URL(req.url).searchParams.get("day") || "";
-  // The day filter runs inside the writer so the row cap can't drop an
-  // older day's events behind newer ones.
-  const qs = new URLSearchParams({ token, kind: "log", n: "800" });
-  if (day) qs.set("day", day);
+  const sp = new URL(req.url).searchParams;
+  const day = sp.get("day") || "";
+  const period = sp.get("period") || "day";
+
+  // Range bounds for week/month periods — computed here so the writer's
+  // `day` filter isn't needed; we pull a wider window and filter locally.
+  let from = day;
+  let to = day;
+  if (period === "week" && day) {
+    const d = new Date(day + "T00:00:00Z");
+    const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
+    const start = new Date(d.getTime() - dow * 864e5);
+    from = start.toISOString().slice(0, 10);
+    to = new Date(start.getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  } else if (period === "month" && day) {
+    from = day.slice(0, 8) + "01";
+    to = day.slice(0, 8) + "31";
+  }
+
+  // The day/from/to filters run inside the writer so the row cap can't
+  // drop an older window's events behind newer ones; the local filter
+  // below stays for a writer deployed before from/to existed.
+  const qs = new URLSearchParams({ token, kind: "log", n: period === "day" ? "800" : "5000" });
+  if (period === "day" && day) qs.set("day", day);
+  else if (period !== "day" && from) {
+    qs.set("from", from);
+    qs.set("to", to);
+  }
   try {
     const res = await fetch(`${base}?${qs}`, { cache: "no-store" });
     const data = await res.json().catch(() => ({}));
@@ -28,7 +51,14 @@ export async function GET(req: Request) {
         { status: 502 }
       );
     }
-    return NextResponse.json({ ok: true, rows: data.rows || [] });
+    let rows: { ts?: string }[] = data.rows || [];
+    if (period !== "day" && from) {
+      rows = rows.filter((r) => {
+        const d = String(r.ts || "").slice(0, 10);
+        return d >= from && d <= to;
+      });
+    }
+    return NextResponse.json({ ok: true, rows, from, to });
   } catch {
     return NextResponse.json({ ok: false, error: "writer unreachable" }, { status: 502 });
   }

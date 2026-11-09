@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
+
+- `/api/admin/report` takes `period=day|week|month`; week = the ISO Mon–Sun containing `day`, month = its calendar month. Period ranges pull `n=5000` and filter locally.
+- Reports tab renamed "Sales report": Day/Week/Month toggle, a fourth "est. revenue" KPI card (net sold × `salePrice`), and a per-model Revenue column (in the CSV export too).
+- Writer gains `weeklyDigest()` (Sunday ~20:00, last 7 days) and `monthlyDigest()` (1st ~08:00, previous calendar month) — sold per model with `· K` stamp revenue, undo count, receipts total, taps. Both registered by `installTriggers()` — rerun it after deploying the new writer version.
+- Dead-stock + low-stock alert cards already live on the dashboard (PR #29 era) — not re-added here.
+
 ### 2026-10-30 — Lookbook, size guide, social links (PR #47)
 
 - New `Lookbook` section between Why Us and FAQs: 6-shot editorial grid (flatlay + category photos) with a lightbox dialog; header nav gains a "Lookbook" link.

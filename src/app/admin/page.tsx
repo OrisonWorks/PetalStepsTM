@@ -310,15 +310,16 @@ function SubscribersPanel() {
 
 function ReportsPanel({ products }: { products: Product[] }) {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
-  const [loadedDay, setLoadedDay] = useState("");
+  const [period, setPeriod] = useState<"day" | "week" | "month">("day");
+  const [loadedLabel, setLoadedLabel] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const load = async (d: string) => {
+  const load = async (d: string, p: "day" | "week" | "month") => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/report?day=${d}`, { cache: "no-store" });
+      const res = await fetch(`/api/admin/report?day=${d}&period=${p}`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         toast.error(data.error || "Report failed");
@@ -326,13 +327,13 @@ function ReportsPanel({ products }: { products: Product[] }) {
       }
       setRows(data.rows || []);
       setLoaded(true);
-      setLoadedDay(d);
+      setLoadedLabel(p === "day" ? data.from : `${data.from} → ${data.to}`);
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => {
-    load(day);
+    load(day, period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -342,29 +343,46 @@ function ReportsPanel({ products }: { products: Product[] }) {
   const byModel = new Map<string, number>();
   const interestByModel = new Map<string, number>();
   const restockByModel = new Map<string, number>();
+  const priceBySku = useMemo(() => new Map(products.map((p) => [p.sku, p.price])), [products]);
+  const revByModel = new Map<string, number>();
+  let revenue = 0;
   netLogRows(rows).forEach(({ r, kind, sign }) => {
     if (kind === "sold" || kind === "restock" || kind === "interest") {
       net[kind as keyof typeof net] += sign;
-      if (kind === "sold") byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
+      if (kind === "sold") {
+        byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
+        const rev = sign * salePrice(r, priceBySku);
+        revByModel.set(r.model, (revByModel.get(r.model) || 0) + rev);
+        revenue += rev;
+      }
       if (kind === "interest") interestByModel.set(r.model, (interestByModel.get(r.model) || 0) + 1);
       if (kind === "restock") restockByModel.set(r.model, (restockByModel.get(r.model) || 0) + sign);
     }
   });
 
-  const modelRows: [string, number, number, number][] = Array.from(
+  const modelRows: [string, number, number, number, number][] = Array.from(
     new Set([...byModel.keys(), ...interestByModel.keys(), ...restockByModel.keys()])
-  ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0, restockByModel.get(m) || 0]);
+  ).map((m) => [m, byModel.get(m) || 0, interestByModel.get(m) || 0, restockByModel.get(m) || 0, revByModel.get(m) || 0]);
   const pg = usePager(modelRows, 15);
   const bySku = useMemo(() => new Map(products.map((p) => [p.sku, p])), [products]);
   const styleOf = (m: string) => { const p = bySku.get(m); return p ? { name: p.name, color: p.color } : null; };
   const exportPdf = () => {
-    exportReportPdf(loadedDay, net, modelRows, styleOf).catch(() => toast.error("PDF export failed"));
+    exportReportPdf(loadedLabel, net, modelRows.map(([m, s, t, rs]) => [m, s, t, rs] as [string, number, number, number]), styleOf).catch(() => toast.error("PDF export failed"));
   };
 
   return (
     <div className="rounded-2xl border border-rose-100 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold text-stone-800">Daily report</h2>
+        <h2 className="font-semibold text-stone-800">Sales report</h2>
+        {(["day", "week", "month"] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => { setPeriod(p); load(day, p); }}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${period === p ? "border-rose-400 bg-rose-50 text-rose-600" : "border-stone-200 bg-white text-stone-500 hover:border-rose-200"}`}
+          >
+            {p}
+          </button>
+        ))}
         <input
           type="date"
           value={day}
@@ -373,7 +391,7 @@ function ReportsPanel({ products }: { products: Product[] }) {
           className="rounded-lg border border-rose-100 px-3 py-1.5 text-sm outline-none focus:border-rose-300"
         />
         <button
-          onClick={() => load(day)}
+          onClick={() => load(day, period)}
           disabled={loading}
           className="rounded-lg bg-rose-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-40"
         >
@@ -382,7 +400,7 @@ function ReportsPanel({ products }: { products: Product[] }) {
         {loaded && modelRows.length > 0 && (
           <div className="ml-auto flex gap-2">
             <button
-              onClick={() => downloadCsv(`petal-report-${loadedDay}.csv`, ["model", "name", "colour", "sold", "interest taps", "restocks"], modelRows.map(([m, s, t, rs]) => { const p = bySku.get(m); return [m, p?.name || "", p?.color || "", s, t, rs]; }))}
+              onClick={() => downloadCsv(`petal-report-${loadedLabel.replace(/\W+/g, "-")}.csv`, ["model", "name", "colour", "sold", "revenue K", "interest taps", "restocks"], modelRows.map(([m, s, t, rs, rv]) => { const p = bySku.get(m); return [m, p?.name || "", p?.color || "", s, rv, t, rs]; }))}
               className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
             >
               CSV / Excel
@@ -398,10 +416,14 @@ function ReportsPanel({ products }: { products: Product[] }) {
       </div>
       {loaded && (
         <>
-          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
             <div className="rounded-xl bg-rose-50 p-3">
               <strong className="block text-2xl text-rose-600">{net.sold}</strong>
               <span className="text-xs text-stone-500">pairs sold</span>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3">
+              <strong className="block text-2xl text-emerald-600">K{revenue.toLocaleString()}</strong>
+              <span className="text-xs text-stone-500">est. revenue</span>
             </div>
             <div className="rounded-xl bg-stone-50 p-3">
               <strong className="block text-2xl text-stone-700">{net.interest}</strong>
@@ -418,24 +440,26 @@ function ReportsPanel({ products }: { products: Product[] }) {
               <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
                 <th className="pb-2">Style</th>
                 <th className="pb-2 text-right">Sold</th>
+                <th className="pb-2 text-right">Revenue</th>
                 <th className="pb-2 text-right">Interest taps</th>
                 <th className="pb-2 text-right">Restocks</th>
               </tr>
             </thead>
             <tbody>
-              {pg.slice.map(([m, sold, taps, restocks]) => (
+              {pg.slice.map(([m, sold, taps, restocks, rev]) => (
                 <tr key={m} className="border-t border-rose-50">
                   <td className="py-2">
                     <span className="font-semibold text-stone-700">{(() => { const s = styleOf(m); return s ? `${s.name} · ${s.color}` : m; })()}</span>
                     {bySku.has(m) && <span className="block text-xs text-stone-400">{m}</span>}
                   </td>
                   <td className="py-2 text-right">{sold}</td>
+                  <td className="py-2 text-right font-semibold text-emerald-600">{rev ? `K${rev.toLocaleString()}` : "—"}</td>
                   <td className="py-2 text-right text-stone-500">{taps}</td>
                   <td className="py-2 text-right text-stone-500">{restocks}</td>
                 </tr>
               ))}
               {net.sold === 0 && net.interest === 0 && net.restock === 0 && (
-                <tr><td colSpan={4} className="py-6 text-center text-stone-400">No activity this day</td></tr>
+                <tr><td colSpan={5} className="py-6 text-center text-stone-400">No activity this {period}</td></tr>
               )}
             </tbody>
           </table>
