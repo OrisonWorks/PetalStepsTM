@@ -44,8 +44,10 @@
  *
  * Time-driven triggers — run installTriggers() ONCE from the editor
  * (Run ▶). It creates/updates:
- *   dailyDigest()  — emails the day's sales/interest summary, ~21:00
- *   backupSheet()  — emails every tab as CSV attachments, Sunday ~06:00
+ *   dailyDigest()   — emails the day's sales/interest summary, ~21:00
+ *   weeklyDigest()  — emails the last-7-days rollup, Sunday ~20:00
+ *   monthlyDigest() — emails the previous month's rollup, 1st ~08:00
+ *   backupSheet()   — emails every tab as CSV attachments, Sunday ~06:00
  * Both mail REPORT_EMAIL (Script Property) or fall back to the owner.
  *
  * Stock-take layout (one row per size): finds every row matching MODEL+SIZE,
@@ -901,6 +903,72 @@ function dailyDigest() {
   );
 }
 
+// Weekly rollup, triggered Sunday evening: last-7-days sales, estimated
+// revenue (from the `· K<price>` stamp on sale notes), taps and receipts.
+function weeklyDigest() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tz = Session.getScriptTimeZone();
+  const start = new Date(Date.now() - 6 * 864e5);
+  const fromDay = Utilities.formatDate(start, tz, "yyyy-MM-dd");
+  const toDay = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  sendRollup_(ss, fromDay, toDay, "weekly sales " + fromDay + " → " + toDay);
+}
+
+// Monthly rollup, triggered on the 1st: the full previous calendar month.
+function monthlyDigest() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const ym = Utilities.formatDate(prev, tz, "yyyy-MM");
+  sendRollup_(ss, ym + "-01", ym + "-31", "monthly sales " + ym);
+}
+
+function sendRollup_(ss, fromDay, toDay, subject) {
+  const rows = sheetRows_(ss, "LOG").filter((r) => {
+    const d = String(r.ts).slice(0, 10);
+    return d >= fromDay && d <= toDay;
+  });
+  const sales = rows.filter((r) => r.action === "sold");
+  const interest = rows.filter((r) => r.action === "interest");
+  const undos = rows.filter((r) => r.action === "undo");
+  const receipts = sheetRows_(ss, "RECEIPTS").filter((r) => {
+    const d = String(r.date).slice(0, 10);
+    return d >= fromDay && d <= toDay;
+  });
+  const perModel = {};
+  const revPerModel = {};
+  let revenue = 0;
+  sales.forEach((r) => {
+    perModel[r.model] = (perModel[r.model] || 0) + 1;
+    const m = /·\s*K(\d+(?:\.\d+)?)/.exec(String(r.note || ""));
+    const rev = m ? parseFloat(m[1]) : 0;
+    revenue += rev;
+    revPerModel[r.model] = (revPerModel[r.model] || 0) + rev;
+  });
+  const lines = Object.keys(perModel)
+    .sort((a, b) => perModel[b] - perModel[a])
+    .map(
+      (m) =>
+        "  " + m + "  ×  " + perModel[m] +
+        (revPerModel[m] ? "  ·  K" + revPerModel[m].toLocaleString() : "")
+    );
+  const receiptsTotal = receipts.reduce(
+    (s, r) => s + (parseInt(String(r.amount), 10) || 0),
+    0
+  );
+  const text =
+    "Petal Steps — " + fromDay + " to " + toDay +
+    "\n\nPairs marked sold: " + sales.length +
+    " (undos logged: " + undos.length + ")" +
+    (lines.length ? "\n" + lines.join("\n") : "\n  (none)") +
+    "\n\nEst. revenue from sale stamps: K" + revenue.toLocaleString() +
+    "\nReceipts issued: " + receipts.length + " (K" + receiptsTotal.toLocaleString() + ")" +
+    "\nInterest taps on WhatsApp order: " + interest.length +
+    "\n\n— Petal Steps shop";
+  MailApp.sendEmail(reportEmail_(), "Petal Steps — " + subject, text);
+}
+
 // Emails every tab as CSV attachments. Daily or weekly trigger.
 function backupSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -941,7 +1009,7 @@ function reportEmail_() {
 // double-fires. First run asks for the Gmail/Calendar-style authorizations
 // MailApp needs; approve once.
 function installTriggers() {
-  const handlers = ["dailyDigest", "backupSheet"];
+  const handlers = ["dailyDigest", "weeklyDigest", "monthlyDigest", "backupSheet"];
   ScriptApp.getProjectTriggers().forEach((t) => {
     if (handlers.indexOf(t.getHandlerFunction()) >= 0)
       ScriptApp.deleteTrigger(t);
@@ -950,6 +1018,16 @@ function installTriggers() {
     .timeBased()
     .everyDays(1)
     .atHour(21)
+    .create();
+  ScriptApp.newTrigger("weeklyDigest")
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(20)
+    .create();
+  ScriptApp.newTrigger("monthlyDigest")
+    .timeBased()
+    .onMonthDay(1)
+    .atHour(8)
     .create();
   ScriptApp.newTrigger("backupSheet")
     .timeBased()
