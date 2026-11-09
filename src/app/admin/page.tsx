@@ -2085,7 +2085,7 @@ export default function AdminPage() {
   const [busyKey, setBusyKey] = useState("");
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
-  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "matte" | "glossy" | "statement" | "red-bottom">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "hidden" | "matte" | "glossy" | "statement" | "red-bottom">("all");
   const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
@@ -2191,8 +2191,39 @@ export default function AdminPage() {
     }
   };
 
+  // Hide/publish writes ACTIVE on the sheet — storefront hides the style but
+  // it stays editable here. `active` is any field updateProduct accepts.
+  const toggleHidden = async (p: Product) => {
+    const ok = await ask(
+      p.hidden
+        ? { title: `Publish ${p.name} back to the storefront?`, body: "Shoppers see it again within ~a minute.", confirmLabel: "Publish" }
+        : { title: `Hide ${p.name} from the storefront?`, body: "Stock stays on the sheet and in reports; shoppers stop seeing the style.", confirmLabel: "Hide" }
+    );
+    if (!ok) return;
+    setBusyKey(p.sku);
+    try {
+      const res = await fetch("/api/admin/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: p.sku, active: p.hidden ? "TRUE" : "hidden" }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Update failed");
+        return;
+      }
+      setProducts((ps) => ps.map((q) => (q.sku === p.sku ? { ...q, hidden: !p.hidden } : q)));
+      toast.success(p.hidden ? `${p.name} is live on the storefront` : `${p.name} hidden from the storefront`);
+    } catch {
+      toast.error("Update failed");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const stockShown = products.filter((p) => {
     const tp = totalPairs(p);
+    if (stockFilter === "hidden") return !!p.hidden;
     if (stockFilter === "low") return tp > 0 && tp <= 5;
     if (stockFilter === "out") return tp === 0;
     if (stockFilter === "all") return true;
@@ -2322,6 +2353,7 @@ export default function AdminPage() {
             ["all", `All (${products.length})`],
             ["low", "Low stock"],
             ["out", "Sold out"],
+            ["hidden", `Hidden (${products.filter((p) => p.hidden).length})`],
             ["matte", "Matte"],
             ["glossy", "Glossy"],
             ["statement", "Statement"],
@@ -2347,13 +2379,25 @@ export default function AdminPage() {
               />
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <h2 className="font-semibold text-stone-800">{p.name}</h2>
+                {p.hidden && (
+                  <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-500">
+                    Hidden from shop
+                  </span>
+                )}
                 <span className="text-xs text-stone-400">
                   {p.sku} · {p.color} · K{p.price}
                 </span>
               </div>
               <button
+                disabled={busyKey === p.sku}
+                onClick={() => void toggleHidden(p)}
+                className={`ml-auto rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${p.hidden ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`}
+              >
+                {p.hidden ? "Publish" : "Hide"}
+              </button>
+              <button
                 onClick={() => void closeEditor(editing === p.sku ? "" : p.sku)}
-                className="ml-auto rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
+                className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-200"
               >
                 {editing === p.sku ? "Close" : "Edit"}
               </button>
