@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — Admin hide/publish styles (PR TBD)
+### 2026-10-30 — Admin hide/publish styles (PR #48)
 
 - The sheet `ACTIVE` column already hid a style from the storefront but admin could never see it — the parser dropped hidden rows even for `?all=1`. Now `getProducts(includeEmpty=true)` returns them with `hidden: true` on `Product`; the public path is unchanged.
 - Stock tab: a **Hidden (n)** filter chip, a "Hidden from shop" badge on hidden cards, and a Hide/Publish button per style — POSTs `active: "hidden" | "TRUE"` through the existing `/api/admin/product` → writer `updateProduct` path (writes on the model's first row, which `firstInGroup` reads).
