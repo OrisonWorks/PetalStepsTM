@@ -13,6 +13,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-10-30 — Lookbook, size guide, social links (PR TBD)
+
+- New `Lookbook` section between Why Us and FAQs: 6-shot editorial grid (flatlay + category photos) with a lightbox dialog; header nav gains a "Lookbook" link.
+- New `SizeGuide` component: EU 35–45 → UK/US/foot-cm conversion dialog, triggered from the shop "My size" strip and the footer Help column.
+- `IG_URL`/`TIKTOK_URL` constants in `src/lib/utils.ts` (empty until handles exist); the footer renders Instagram/TikTok links only when set.
+
 ### 2026-10-30 — Remove duplicated policy cards (PR #46)
 
 - The three printed policy cards (order & payment, Lusaka delivery, out-of-town delivery) rendered twice on the storefront — under FAQs (their contextual home, with "tap the policy cards" copy) and again inside the Contact section. Dropped the Contact copy.

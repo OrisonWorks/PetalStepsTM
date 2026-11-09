@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { BadgeCheck, ChevronDown, Clock, Facebook, MapPin, MessageCircle, PiggyBank, ShieldCheck, Star, Truck } from "lucide-react";
+import { BadgeCheck, ChevronDown, Clock, Facebook, Instagram, MapPin, MessageCircle, Music2, PiggyBank, Ruler, ShieldCheck, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Lottie } from "@/components/Lottie";
 import { PromoPlayer } from "@/components/PromoPlayer";
 import { useCart } from "@/context/cart-context";
-import { FB_URL, money, SHOP_ADDRESS, WA_DISPLAY, waLink } from "@/lib/utils";
+import { FB_URL, IG_URL, money, SHOP_ADDRESS, TIKTOK_URL, WA_DISPLAY, waLink } from "@/lib/utils";
 import type { Filter } from "@/lib/products";
 
 const CATS: { filter: Filter; label: string; sub: string; img: string }[] = [
@@ -146,6 +146,99 @@ export function Reviews() {
         ))}
       </div>
     </section>
+  );
+}
+
+const LOOKBOOK = [
+  { src: "/brand/flatlay.jpg", caption: "The full collection, laid out" },
+  { src: "/products/image3.jpg", caption: "Matte finish — everyday polish" },
+  { src: "/products/image6.jpg", caption: "Glossy camel — high shine" },
+  { src: "/products/image21.jpg", caption: "Statement florals" },
+  { src: "/products/image25.jpg", caption: "Signature red bottoms" },
+  { src: "/products/image10.jpg", caption: "New season drops" },
+];
+
+// Editorial strip: tap any shot for a full-size look.
+export function Lookbook() {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <section id="lookbook" className="mx-auto w-[min(1180px,92%)] pb-16">
+      <div className="mx-auto mb-8 max-w-xl text-center">
+        <Badge variant="soft" className="mb-3">Lookbook</Badge>
+        <h2 className="font-display text-4xl font-semibold">The shelves, up close</h2>
+        <p className="mt-2 text-stone-500">Real photos of real stock — tap a shot to see it full size.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {LOOKBOOK.map((shot, i) => (
+          <button
+            key={shot.src}
+            type="button"
+            onClick={() => setOpen(i)}
+            className="group relative overflow-hidden rounded-2xl border border-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-400"
+          >
+            <Image src={shot.src} alt={shot.caption} width={700} height={700} loading="lazy" className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-stone-900/80 to-transparent px-3 pb-2 pt-8 text-left text-xs font-semibold text-white">{shot.caption}</span>
+          </button>
+        ))}
+      </div>
+      <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
+        <DialogContent className="max-w-2xl p-0">
+          {open !== null && (
+            <>
+              <DialogTitle className="sr-only">{LOOKBOOK[open].caption}</DialogTitle>
+              <Image src={LOOKBOOK[open].src} alt={LOOKBOOK[open].caption} width={1080} height={1080} className="h-auto w-full" />
+              <p className="px-4 py-3 text-center text-sm text-stone-500">{LOOKBOOK[open].caption}</p>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+// Approximate women's conversions — sizing varies by style; WhatsApp us to double-check.
+const SIZE_ROWS: [number, string, string, string][] = [
+  [35, "2.5", "5", "22.0"],
+  [36, "3.5", "6", "22.5"],
+  [37, "4", "6.5", "23.0"],
+  [38, "5", "7.5", "24.0"],
+  [39, "6", "8.5", "24.5"],
+  [40, "6.5", "9", "25.0"],
+  [41, "7.5", "10", "25.5"],
+  [42, "8", "10.5", "26.0"],
+  [43, "9", "11", "26.5"],
+  [44, "9.5", "12", "27.0"],
+  [45, "10.5", "12.5", "27.5"],
+];
+
+export function SizeGuide({ className }: { className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className ?? "inline-flex items-center gap-1 text-xs font-bold text-rose-600 underline-offset-2 hover:underline"}>
+        <Ruler className="h-3.5 w-3.5" aria-hidden="true" /> Size guide
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogTitle className="font-display text-xl font-semibold">Size guide — EU 35–45</DialogTitle>
+          <p className="text-sm text-stone-500">Measure your foot heel-to-toe in cm and match the closest row. Sizing can vary by style — message {WA_DISPLAY} if you&apos;re between sizes.</p>
+          <table className="mt-2 w-full text-sm">
+            <thead>
+              <tr className="border-b border-rose-100 text-left text-xs uppercase tracking-wider text-stone-400">
+                <th className="py-2">EU</th><th className="py-2">UK</th><th className="py-2">US</th><th className="py-2">Foot (cm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SIZE_ROWS.map(([eu, uk, us, cm]) => (
+                <tr key={eu} className="border-b border-rose-50">
+                  <td className="py-1.5 font-bold">{eu}</td><td className="py-1.5">{uk}</td><td className="py-1.5">{us}</td><td className="py-1.5">{cm}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -403,8 +496,8 @@ export function Footer() {
           <p className="mt-2 max-w-xs text-sm text-rose-200/70">Women&apos;s heels that bloom with every step. Lusaka, Zambia.</p>
         </div>
         <div><h4 className="font-display mb-3 font-semibold text-white">Shop</h4>{[["All heels", "#shop"], ["Matte", "#categories"], ["Glossy", "#categories"], ["Red Bottom", "#categories"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["FAQs — ordering, payment & delivery", "#faqs"], ["How ordering works", "#why"], ["Delivery — Lusaka & out of town", "#faqs"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}</div>
-        <div><h4 className="font-display mb-3 font-semibold text-white">Visit / follow</h4><p className="py-1 text-rose-200/80">{SHOP_ADDRESS}</p><a href={waLink("Hi Petal Steps by Thandiwe Mwaba!")} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">WhatsApp {WA_DISPLAY}</a><a href={FB_URL} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">Facebook</a></div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Help</h4>{[["FAQs — ordering, payment & delivery", "#faqs"], ["How ordering works", "#why"], ["Delivery — Lusaka & out of town", "#faqs"], ["Contact us", "#contact"]].map(([l, h]) => <a key={l} href={h} className="block py-1 text-rose-200/80 hover:text-white">{l}</a>)}<SizeGuide className="inline-flex items-center gap-1 py-1 text-sm text-rose-200/80 hover:text-white" /></div>
+        <div><h4 className="font-display mb-3 font-semibold text-white">Visit / follow</h4><p className="py-1 text-rose-200/80">{SHOP_ADDRESS}</p><a href={waLink("Hi Petal Steps by Thandiwe Mwaba!")} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">WhatsApp {WA_DISPLAY}</a><a href={FB_URL} target="_blank" rel="noreferrer" className="block py-1 text-rose-200/80 hover:text-white">Facebook</a>{IG_URL && <a href={IG_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 py-1 text-rose-200/80 hover:text-white"><Instagram className="h-4 w-4" aria-hidden="true" /> Instagram</a>}{TIKTOK_URL && <a href={TIKTOK_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 py-1 text-rose-200/80 hover:text-white"><Music2 className="h-4 w-4" aria-hidden="true" /> TikTok</a>}</div>
       </div>
       <div className="border-t border-white/10">
         <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap justify-between gap-2 py-4 text-xs text-rose-200/60">

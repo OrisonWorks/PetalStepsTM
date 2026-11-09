@@ -10,7 +10,7 @@ export function Header({ search, setSearch }: { search: string; setSearch: (v: s
   const { count, setOpen } = useCart();
   const [showSearch, setShowSearch] = useState(false);
   const [menu, setMenu] = useState(false);
-  const links = [["Shop", "#shop"], ["Categories", "#categories"], ["Why Us", "#why"], ["Reviews", "#reviews"], ["Contact", "#contact"]] as const;
+  const links = [["Shop", "#shop"], ["Categories", "#categories"], ["Lookbook", "#lookbook"], ["Why Us", "#why"], ["Reviews", "#reviews"], ["Contact", "#contact"]] as const;
 
   return (
     <header className="sticky top-0 z-40 border-b border-rose-100 bg-[#fffafc]/90 backdrop-blur">
