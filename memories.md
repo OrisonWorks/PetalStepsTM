@@ -13,7 +13,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-10-30 — WhatsApp Cloud API plumbing, env-gated (PR TBD)
+### 2026-10-30 — WhatsApp Cloud API plumbing, env-gated (PR #50)
 
 - `src/lib/whatsapp.ts`: `waCloudConfigured()`, `waSendText`, `waSendTemplate` over Meta Graph v21.0 — all no-op until `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` exist.
 - `/api/admin/send-update` (POST, authed): sends via Cloud API when configured; on any failure or missing config returns `{mode:"link", link}` so the caller opens wa.me — one button covers both worlds.
