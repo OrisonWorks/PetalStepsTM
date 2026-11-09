@@ -84,7 +84,8 @@ function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = fals
   }
   const products: Product[] = [];
   for (const [model, rs] of groups) {
-    if (isInactive(firstInGroup(rs, "active"))) continue;
+    const hidden = isInactive(firstInGroup(rs, "active"));
+    if (hidden && !includeEmpty) continue;
     const stock: Record<number, number> = {};
     for (const r of rs) {
       const size = parseInt((r.size || "").replace(/[^0-9]/g, ""), 10);
@@ -114,6 +115,7 @@ function stockTakeToProducts(rows: Record<string, string>[], includeEmpty = fals
       img,
       desc: firstInGroup(rs, "description") || firstInGroup(rs, "desc") || base?.desc || "",
       stock,
+      ...(hidden ? { hidden: true } : {}),
     });
   }
   return products;
@@ -123,7 +125,8 @@ function catalogueRowsToProducts(rows: Record<string, string>[], includeEmpty = 
   const bySku = new Map(PRODUCTS.map((p) => [p.sku, p]));
   const products: Product[] = [];
   for (const r of rows) {
-    if (isInactive(r.active)) continue;
+    const hidden = isInactive(r.active);
+    if (hidden && !includeEmpty) continue;
     const sku = r.sku || r.model || "";
     const name = r.name || "";
     const price = parseInt((r.price || "").replace(/[^0-9]/g, ""), 10);
@@ -147,6 +150,7 @@ function catalogueRowsToProducts(rows: Record<string, string>[], includeEmpty = 
       img,
       desc: r.description || r.desc || "",
       stock,
+      ...(hidden ? { hidden: true } : {}),
     });
   }
   return products;

@@ -3,6 +3,8 @@ export type Category = "matte" | "glossy" | "statement" | "red-bottom";
 export interface Product {
   id: number; sku: string; name: string; color: string; cat: Category;
   price: number; img: string; desc: string; stock: Record<number, number>;
+  /** Sheet ACTIVE column says hide it — only ever set on admin (?all=1) results. */
+  hidden?: boolean;
 }
 
 export const totalPairs = (p: Product) => Object.values(p.stock).reduce((a, b) => a + b, 0);
@@ -30,7 +32,7 @@ export function toClientProduct(p: Product): ClientProduct {
       total += c;
     }
   }
-  const { sku: _sku, stock: _stock, ...rest } = p;
+  const { sku: _sku, stock: _stock, hidden: _hidden, ...rest } = p;
   return { ...rest, stock, lowStock: total > 0 && total <= FEW_TOTAL };
 }
 
