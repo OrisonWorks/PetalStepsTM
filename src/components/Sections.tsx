@@ -81,21 +81,6 @@ export function Categories({ onSelect }: { onSelect: (f: Filter) => void }) {
   );
 }
 
-export function SaleBanner({ onSelect }: { onSelect: (f: Filter) => void }) {
-  return (
-    <section className="bg-gradient-to-r from-[#c084fc] via-rose-400 to-[#fda4af] py-12 text-white">
-      <div className="mx-auto flex w-[min(1180px,92%)] flex-wrap items-center justify-between gap-6">
-        <div>
-          <Badge className="mb-3 bg-white/20 text-white">Grand opening · 24 October 2026 · 09:00–13:00</Badge>
-          <h2 className="font-display text-4xl font-semibold">Come celebrate with us in Thompson Park</h2>
-          <p className="mt-1 text-rose-50">{SHOP_ADDRESS}. Almost-gone styles are marked — grab your EU size before it sells out.</p>
-        </div>
-        <Button variant="light" size="lg" onClick={() => onSelect("low")}>Shop almost-gone heels</Button>
-      </div>
-    </section>
-  );
-}
-
 const WHY = [
   { icon: BadgeCheck, title: "Real stock, real sizes", text: "Every style shows the EU sizes actually in stock, updated live from our sheet. No guessing." },
   { icon: PiggyBank, title: "Honest Kwacha prices", text: "All heels K450–K650. Kitten heels to signature red bottoms — the price is on the pair." },

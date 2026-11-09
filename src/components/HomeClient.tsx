@@ -5,7 +5,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { Header } from "@/components/Header";
 import { QuickView } from "@/components/QuickView";
-import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Lookbook, Marquee, MobileOrderBar, Newsletter, Reviews, SaleBanner, WhyUs } from "@/components/Sections";
+import { BackToTop, Categories, Contact, Faqs, Footer, Hero, Lookbook, Marquee, MobileOrderBar, Newsletter, Reviews, WhyUs } from "@/components/Sections";
 import { Shop } from "@/components/Shop";
 import { type ClientProduct, type Filter } from "@/lib/products";
 
@@ -54,7 +54,6 @@ export function HomeClient({ products }: { products: ClientProduct[] }) {
         <Reviews />
         <Categories onSelect={goFilter} />
         <Shop products={products} filter={filter} setFilter={setFilter} search={search} sort={sort} setSort={setSort} onQuick={setQuick} size={size} setSize={setSize} />
-        <SaleBanner onSelect={goFilter} />
         <WhyUs />
         <Lookbook />
         <Faqs />

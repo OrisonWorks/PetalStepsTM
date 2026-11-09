@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-11-09 — Grand-opening banner removed (PR TBD)
+
+- The `SaleBanner` gradient section ("Grand opening · 24 October 2026 · Come celebrate with us in Thompson Park") is deleted — the event passed. The shop's almost-gone filter stays reachable via the filter chips and `?cat=low` deep link.
+
 ### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
 
 - `/api/admin/report` takes `period=day|week|month`; week = the ISO Mon–Sun containing `day`, month = its calendar month. Period ranges pull `n=5000` and filter locally.
