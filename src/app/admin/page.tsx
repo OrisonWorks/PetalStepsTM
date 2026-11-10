@@ -94,6 +94,29 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
   const out: NetRow[] = rows.map((r) => ({ r, ...countAction(r) }));
   for (let i = out.length - 1; i >= 0; i--) {
     const u = out[i];
+    if (u.sign === 0) continue;
+    if (u.r.action === "unvoid") {
+      const match = /^unvoid (sold|remove|restock) (.*)$/.exec(String(u.r.note || ""));
+      if (!match) continue;
+      const voidNote = `void ${match[1]} ${match[2]}`;
+      for (let j = i - 1; j >= 0; j--) {
+        const v = out[j];
+        if (v.sign === 0 || v.r.action !== "void") continue;
+        if (v.r.model !== u.r.model || String(v.r.size) !== String(u.r.size) || String(v.r.note) !== voidNote) continue;
+        for (let k = j - 1; k >= 0; k--) {
+          const o = out[k];
+          if (o.sign === 0 || o.r.action !== match[1]) continue;
+          if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) && String(o.r.note) === match[2]) {
+            o.sign = 1;
+            v.sign = 0;
+            u.sign = 0;
+            break;
+          }
+        }
+        break;
+      }
+      continue;
+    }
     if (u.r.action === "void") {
       const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
@@ -1876,6 +1899,7 @@ const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
   sold: { label: "Sold", cls: "bg-rose-100 text-rose-600" },
   remove: { label: "Removed", cls: "bg-amber-100 text-amber-700" },
   void: { label: "Correction", cls: "bg-amber-100 text-amber-700" },
+  unvoid: { label: "Restored", cls: "bg-emerald-100 text-emerald-700" },
   restock: { label: "Restock", cls: "bg-emerald-100 text-emerald-700" },
   undo: { label: "Undo", cls: "bg-amber-100 text-amber-700" },
   interest: { label: "Order tap", cls: "bg-sky-100 text-sky-700" },
@@ -1896,7 +1920,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
   const rows = (data?.log || []).slice().reverse();
   const groups: Record<typeof filter, (a: string) => boolean> = {
     all: () => true,
-    stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo" || a === "void",
+    stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo" || a === "void" || a === "unvoid",
     taps: (a) => a === "interest",
     admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter", "whatsapp"].includes(a),
   };
@@ -1926,6 +1950,25 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
       await reload();
     } catch {
       toast.error("Couldn't correct sale");
+    }
+  };
+  const restoreSale = async (r: LogRow) => {
+    if (!(await ask({ title: "Restore this sale?", body: "This restores the sale in reports and revenue without changing current stock.", confirmLabel: "Restore sale" }))) return;
+    try {
+      const res = await fetch("/api/admin/sold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: r.model, size: r.size, action: "restoreSale", targetTs: r.ts, targetNote: r.note }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Couldn't restore sale");
+        return;
+      }
+      toast.success("Sale restored — stock was not changed");
+      await reload();
+    } catch {
+      toast.error("Couldn't restore sale");
     }
   };
 
@@ -1982,6 +2025,8 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
               {pg.slice.map((r, i) => {
                 const p = bySku.get(r.model);
                 const kind = AUDIT_KINDS[r.action];
+                const corrected = rows.some((v) => v.action === "void" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `void sold ${r.note}`);
+                const restored = rows.some((v) => v.action === "unvoid" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `unvoid sold ${r.note}`);
                 return (
                   <tr key={`${r.ts}-${i}`} className="border-t border-rose-50">
                     <td className="py-1.5 pr-3 whitespace-nowrap text-stone-500">{String(r.ts).replace("T", " ").slice(0, 16)}</td>
@@ -1995,13 +2040,13 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
                     <td className="py-1.5 pr-3 text-stone-500">{r.size ? `EU ${r.size}` : "—"}</td>
                     <td className="py-1.5 text-stone-500">{r.note || "—"}</td>
                     <td className="py-1.5">
-                      {r.action === "sold" && (
+                      {r.action === "sold" && !restored && (
                         <button
                           type="button"
-                          onClick={() => void voidSale(r)}
+                          onClick={() => void (corrected ? restoreSale(r) : voidSale(r))}
                           className="rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100"
                         >
-                          Not sold
+                          {corrected ? "Restore sale" : "Not sold"}
                         </button>
                       )}
                     </td>

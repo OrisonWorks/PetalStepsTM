@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         size: sizeNum,
         delta,
         set,
-        action: action === "remove" || action === "voidSale" ? action : undefined,
+        action: action === "remove" || action === "voidSale" || action === "restoreSale" ? action : undefined,
         targetTs: action === "voidSale" ? targetTs : undefined,
         targetNote: action === "voidSale" ? targetNote : undefined,
         undo: undo === true,
