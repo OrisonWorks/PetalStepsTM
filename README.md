@@ -58,6 +58,7 @@ A passcode-protected page at `/admin` lists every style with per-size counts and
    - `ADMIN_PASSCODE` — the password you sign in with at `/admin`
    - `STOCK_WRITER_URL` — the `/exec` URL from step 3
    - `STOCK_WRITER_TOKEN` — the same `STOCK_TOKEN` value from step 2
+5. Before the first photo upload, select `authorizeDrive` in the Apps Script function dropdown and click **Run**. Review and allow the Google Drive permission when prompted. Then deploy a **New version** with **Execute as: Me**; this one-time authorization enables the admin Upload image button.
 5. Redeploy/restart, then open `/admin`.
 
 The script supports both sheet layouts: your stock-take format (`MODEL`/`SIZE`/`COUNT` rows — it updates the matching row's `COUNT`, or appends a row when restocking a size that never had one) and the catalogue format (`stock_35`…`stock_45` columns).
