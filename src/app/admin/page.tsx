@@ -96,9 +96,9 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
     const u = out[i];
     if (u.sign === 0) continue;
     if (u.r.action === "unvoid") {
-      const match = /^unvoid (sold|remove|restock) (.*)$/.exec(String(u.r.note || ""));
+      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
-      const voidNote = `void ${match[1]} ${match[2]}`;
+      const voidNote = `void ${match[1]} ${match[3]}`;
       for (let j = i - 1; j >= 0; j--) {
         const v = out[j];
         if (v.sign === 0 || v.r.action !== "void") continue;
@@ -106,7 +106,8 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
         for (let k = j - 1; k >= 0; k--) {
           const o = out[k];
           if (o.sign === 0 || o.r.action !== match[1]) continue;
-          if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) && String(o.r.note) === match[2]) {
+          if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) &&
+              String(o.r.ts) === match[2] && String(o.r.note) === match[3]) {
             o.sign = 1;
             v.sign = 0;
             u.sign = 0;
@@ -2026,7 +2027,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
                 const p = bySku.get(r.model);
                 const kind = AUDIT_KINDS[r.action];
                 const corrected = rows.some((v) => v.action === "void" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `void sold ${r.note}`);
-                const restored = rows.some((v) => v.action === "unvoid" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `unvoid sold ${r.note}`);
+                const restored = rows.some((v) => v.action === "unvoid" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `unvoid sold ${r.ts} ${r.note}`);
                 return (
                   <tr key={`${r.ts}-${i}`} className="border-t border-rose-50">
                     <td className="py-1.5 pr-3 whitespace-nowrap text-stone-500">{String(r.ts).replace("T", " ").slice(0, 16)}</td>
