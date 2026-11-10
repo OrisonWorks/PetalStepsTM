@@ -9,7 +9,8 @@
  *      Who has access: Anyone → Deploy. Copy the /exec URL into
  *      STOCK_WRITER_URL.
  *
- * POST JSON body: { token, model, size, set? , delta? }
+ * POST JSON body: { token, model, size, set? , delta?, action?: "remove",
+ *   undo?: boolean, undoAction?: "remove" }
  *   - `set` writes an absolute count; otherwise `delta` (default -1) is applied,
  *     clamped at 0.
  * POST JSON body: { token, action: "updateProduct", model, fields }
@@ -176,8 +177,17 @@ function doPost(e) {
       // Stamp the sale-time price into the note so revenue stays correct
       // after later price edits — "0→1 · K450". Legacy rows lack the suffix
       // and the app falls back to the current list price.
-      appendLog_(body.undo ? "undo" : next < current ? "sold" : "restock", model, size,
-        current + "→" + next + priceSuffix_(data, modelCol, model, priceCol));
+      const event = body.undo
+        ? "undo"
+        : body.action === "remove"
+          ? "remove"
+          : next < current
+            ? "sold"
+            : "restock";
+      const note = current + "→" + next +
+        (body.undo && body.undoAction === "remove" ? " · remove" : "") +
+        priceSuffix_(data, modelCol, model, priceCol);
+      appendLog_(event, model, size, note);
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
       SpreadsheetApp.flush();
@@ -822,7 +832,11 @@ function doGet(e) {
         if (u.action !== "undo") continue;
         const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
         if (m.length !== 2 || m.some((x) => isNaN(x))) continue;
-        const kind = m[1] > m[0] ? "sold" : "restock";
+        const kind = String(u.note || "").includes("· remove")
+          ? "remove"
+          : m[1] > m[0]
+            ? "sold"
+            : "restock";
         const mirror = m[1] + "→" + m[0];
         for (let j = i - 1; j >= 0; j--) {
           const o = rows[j];
@@ -951,7 +965,11 @@ function sendRollup_(ss, fromDay, toDay, subject) {
     if (u.action !== "undo") continue;
     const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
     if (m.length !== 2 || m.some((x) => isNaN(x))) continue;
-    const kind = m[1] > m[0] ? "sold" : "restock";
+    const kind = String(u.note || "").includes("· remove")
+      ? "remove"
+      : m[1] > m[0]
+        ? "sold"
+        : "restock";
     const mirror = m[1] + "→" + m[0];
     for (let j = i - 1; j >= 0; j--) {
       const o = log[j];

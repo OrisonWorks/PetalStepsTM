@@ -13,6 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-11-10 — Separate sold from removed stock (PR TBD)
+
+- Stock admin now has distinct actions: **Mark sold** decrements inventory and contributes to sales/revenue; **Remove** decrements inventory without creating a sale. Both actions can be undone, and the Activity tab labels removals separately.
+- Removal and undo notes carry a small `· remove` marker so the writer and reports can pair them correctly without changing the existing LOG columns.
+
 ### 2026-11-09 — Add explicit Drive authorization helper (PR TBD)
 
 - `scripts/stock_writer.gs` now exposes `authorizeDrive()` for the Apps Script editor. Running it once grants the Drive scope and creates/reuses `petalsteps-photos`, avoiding the confusing first-upload `DriveApp` permission error.

@@ -47,7 +47,7 @@ If you publish a stock-take sheet instead — one row per size with columns like
 
 ## Stock admin (`/admin`) — mark sold from the site
 
-A passcode-protected page at `/admin` lists every style with per-size counts and `−`/`+` buttons: `−` marks one pair sold, `+` restocks. Writes go through a small Google Apps Script you deploy once on your spreadsheet — the published CSV is read-only, so the script is the write path. Changes reach the storefront within seconds.
+A passcode-protected page at `/admin` lists every style with per-size counts: **Mark sold** records a sale, **Remove** takes a pair off available stock without counting revenue, and `+` restocks. Each action can be undone. Writes go through a small Google Apps Script you deploy once on your spreadsheet — the published CSV is read-only, so the script is the write path. Changes reach the storefront within seconds.
 
 ### One-time setup (in your Google account)
 
