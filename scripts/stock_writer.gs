@@ -470,7 +470,7 @@ function voidSale(body, out) {
       const v = rows[i];
       if (v.action !== "void" || String(v.model) !== model || String(v.size) !== size) continue;
       const marker = String(v.note || "");
-      const match = /^void sold (?:(\S+) )?(.*)$/.exec(marker);
+      const match = /^void sold (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(marker);
       if (!match) continue;
       for (let j = i - 1; j >= 0; j--) {
         const o = rows[j];
@@ -952,7 +952,7 @@ function doGet(e) {
           continue;
         }
         if (u.action === "void") {
-          const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.note || ""));
+          const match = /^void (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
           if (!match) continue;
           for (let j = i - 1; j >= 0; j--) {
             const o = rows[j];
@@ -1124,7 +1124,7 @@ function sendRollup_(ss, fromDay, toDay, subject) {
       continue;
     }
     if (u.action === "void") {
-      const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.note || ""));
+      const match = /^void (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
       if (!match) continue;
       for (let j = i - 1; j >= 0; j--) {
         const o = log[j];
