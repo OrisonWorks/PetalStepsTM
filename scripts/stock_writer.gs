@@ -11,6 +11,8 @@
  *
  * POST JSON body: { token, model, size, set? , delta?, action?: "remove",
  *   undo?: boolean, undoAction?: "remove" }
+ * POST JSON body: { token, action: "voidSale", model, size, targetTs,
+ *   targetNote } — corrects a mistakenly recorded sale without changing stock.
  *   - `set` writes an absolute count; otherwise `delta` (default -1) is applied,
  *     clamped at 0.
  * POST JSON body: { token, action: "updateProduct", model, fields }
@@ -72,6 +74,7 @@ function doPost(e) {
     if (!token || body.token !== token)
       return out({ ok: false, error: "unauthorized" });
 
+    if (body.action === "voidSale") return voidSale(body, out);
     if (body.action === "updateProduct")
       return updateProduct(body, out);
     if (body.action === "createProduct")
@@ -438,6 +441,44 @@ function sheetRows_(ss, name) {
     rows.push(row);
   }
   return rows;
+}
+
+// Corrects a mistakenly recorded sale after the short-lived stock toast has
+// disappeared. This is a log correction only: current stock is unchanged.
+function voidSale(body, out) {
+  const model = String(body.model || "").trim();
+  const size = String(body.size || "").trim();
+  const targetTs = String(body.targetTs || "").trim();
+  const targetNote = String(body.targetNote || "").trim();
+  if (!model || !size || !targetTs || !targetNote)
+    return out({ ok: false, error: "target sale required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const rows = sheetRows_(SpreadsheetApp.getActiveSpreadsheet(), "LOG");
+    const target = rows.find((r) =>
+      r.action === "sold" &&
+      String(r.model) === model &&
+      String(r.size) === size &&
+      String(r.ts) === targetTs &&
+      String(r.note) === targetNote
+    );
+    if (!target) return out({ ok: false, error: "sale not found" });
+    const marker = "void sold " + target.note;
+    if (rows.some((r) =>
+      r.action === "void" &&
+      String(r.model) === model &&
+      String(r.size) === size &&
+      String(r.note) === marker
+    ))
+      return out({ ok: false, error: "sale already corrected" });
+    if (!appendLog_("void", model, size, marker))
+      return out({ ok: false, error: "correction failed" });
+    return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
 }
 
 // ---------- event log ----------
@@ -829,6 +870,20 @@ function doGet(e) {
       const dead = new Array(rows.length).fill(false);
       for (let i = rows.length - 1; i >= 0; i--) {
         const u = rows[i];
+        if (u.action === "void") {
+          const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
+          if (!match) continue;
+          for (let j = i - 1; j >= 0; j--) {
+            const o = rows[j];
+            if (dead[j] || o.action !== match[1]) continue;
+            if (o.model === u.model && String(o.size) === String(u.size) && String(o.note) === match[2]) {
+              dead[j] = true;
+              dead[i] = true;
+              break;
+            }
+          }
+          continue;
+        }
         if (u.action !== "undo") continue;
         const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
         if (m.length !== 2 || m.some((x) => isNaN(x))) continue;
@@ -962,6 +1017,20 @@ function sendRollup_(ss, fromDay, toDay, subject) {
   const dead = new Array(log.length).fill(false);
   for (let i = log.length - 1; i >= 0; i--) {
     const u = log[i];
+    if (u.action === "void") {
+      const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
+      if (!match) continue;
+      for (let j = i - 1; j >= 0; j--) {
+        const o = log[j];
+        if (dead[j] || o.action !== match[1]) continue;
+        if (o.model === u.model && String(o.size) === String(u.size) && String(o.note) === match[2]) {
+          dead[j] = true;
+          dead[i] = true;
+          break;
+        }
+      }
+      continue;
+    }
     if (u.action !== "undo") continue;
     const m = String(u.note || "").split("→").map((x) => parseInt(x, 10));
     if (m.length !== 2 || m.some((x) => isNaN(x))) continue;

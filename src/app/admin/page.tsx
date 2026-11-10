@@ -68,6 +68,7 @@ const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 // "a→b" stock note as the write they reversed, so the direction says which
 // bucket to decrement: next>prev reversed a sale, next<prev a restock.
 const countAction = (r: LogRow): { kind: string; sign: number } => {
+  if (r.action === "void") return { kind: "void", sign: 1 };
   if (r.action !== "undo") return { kind: r.action, sign: 1 };
   const m = String(r.note || "").split("→").map((x) => parseInt(x, 10));
   if (String(r.note || "").includes("· remove")) return { kind: "remove", sign: -1 };
@@ -93,6 +94,24 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
   const out: NetRow[] = rows.map((r) => ({ r, ...countAction(r) }));
   for (let i = out.length - 1; i >= 0; i--) {
     const u = out[i];
+    if (u.r.action === "void") {
+      const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.r.note || ""));
+      if (!match) continue;
+      for (let j = i - 1; j >= 0; j--) {
+        const o = out[j];
+        if (o.sign === 0 || o.r.action !== match[1]) continue;
+        if (
+          o.r.model === u.r.model &&
+          String(o.r.size) === String(u.r.size) &&
+          String(o.r.note) === match[2]
+        ) {
+          o.sign = 0;
+          u.sign = 0;
+          break;
+        }
+      }
+      continue;
+    }
     if (u.r.action !== "undo" || u.kind === "undo") continue;
     const m = String(u.r.note).split("→").map((x) => parseInt(x, 10));
     const mirror = `${m[1]}→${m[0]}`;
@@ -1856,6 +1875,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
 const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
   sold: { label: "Sold", cls: "bg-rose-100 text-rose-600" },
   remove: { label: "Removed", cls: "bg-amber-100 text-amber-700" },
+  void: { label: "Correction", cls: "bg-amber-100 text-amber-700" },
   restock: { label: "Restock", cls: "bg-emerald-100 text-emerald-700" },
   undo: { label: "Undo", cls: "bg-amber-100 text-amber-700" },
   interest: { label: "Order tap", cls: "bg-sky-100 text-sky-700" },
@@ -1871,17 +1891,43 @@ const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
 // taps, and admin writes (edits, new styles, receipts, opt-outs, newsletters).
 function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof useAnalytics>; products: Product[] }) {
   const { data, loading, reload } = analytics;
+  const { ask, dialog } = useConfirm();
   const [filter, setFilter] = useState<"all" | "stock" | "taps" | "admin">("all");
   const rows = (data?.log || []).slice().reverse();
   const groups: Record<typeof filter, (a: string) => boolean> = {
     all: () => true,
-    stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo",
+    stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo" || a === "void",
     taps: (a) => a === "interest",
     admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter", "whatsapp"].includes(a),
   };
   const shown = rows.filter((r) => groups[filter](r.action));
   const pg = usePager(shown, 15);
   const bySku = new Map(products.map((p) => [p.sku, p]));
+  const voidSale = async (r: LogRow) => {
+    if (!(await ask({ title: "Correct this sale as not sold?", body: "This removes the sale from reports and revenue without changing current stock.", confirmLabel: "Correct sale" }))) return;
+    try {
+      const res = await fetch("/api/admin/sold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: r.model,
+          size: r.size,
+          action: "voidSale",
+          targetTs: r.ts,
+          targetNote: r.note,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.error(d.error || "Couldn't correct sale");
+        return;
+      }
+      toast.success("Sale corrected — stock was not changed");
+      await reload();
+    } catch {
+      toast.error("Couldn't correct sale");
+    }
+  };
 
   if (loading || !data) {
     return (
@@ -1929,7 +1975,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-stone-400">
                 <th className="pb-1">When</th><th className="pb-1">Action</th><th className="pb-1">Style</th>
-                <th className="pb-1">Size</th><th className="pb-1">Detail</th>
+                <th className="pb-1">Size</th><th className="pb-1">Detail</th><th className="pb-1">Correction</th>
               </tr>
             </thead>
             <tbody>
@@ -1948,6 +1994,17 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
                     </td>
                     <td className="py-1.5 pr-3 text-stone-500">{r.size ? `EU ${r.size}` : "—"}</td>
                     <td className="py-1.5 text-stone-500">{r.note || "—"}</td>
+                    <td className="py-1.5">
+                      {r.action === "sold" && (
+                        <button
+                          type="button"
+                          onClick={() => void voidSale(r)}
+                          className="rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                        >
+                          Not sold
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -1956,6 +2013,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
         </div>
       )}
       <Pager page={pg.page} pages={pg.pages} onPage={pg.setPage} />
+      {dialog}
     </div>
   );
 }
