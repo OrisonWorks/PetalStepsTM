@@ -119,7 +119,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
       continue;
     }
     if (u.r.action === "void") {
-      const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.r.note || ""));
+      const match = /^void (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
       for (let j = i - 1; j >= 0; j--) {
         const o = out[j];
@@ -161,7 +161,7 @@ const correctedSaleKeys = (rows: LogRow[]) => {
   for (let i = rows.length - 1; i >= 0; i--) {
     const v = rows[i];
     if (v.action !== "void") continue;
-    const match = /^void sold (?:(\S+) )?(.*)$/.exec(String(v.note || ""));
+    const match = /^void sold (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(v.note || ""));
     if (!match) continue;
     for (let j = i - 1; j >= 0; j--) {
       const o = rows[j];
