@@ -47,7 +47,7 @@ If you publish a stock-take sheet instead — one row per size with columns like
 
 ## Stock admin (`/admin`) — mark sold from the site
 
-A passcode-protected page at `/admin` lists every style with per-size counts: **Mark sold** records a sale, **Remove** takes a pair off available stock without counting revenue, and `+` restocks. Each action can be undone. Writes go through a small Google Apps Script you deploy once on your spreadsheet — the published CSV is read-only, so the script is the write path. Changes reach the storefront within seconds.
+A passcode-protected page at `/admin` lists every style with per-size counts: **Mark sold** records a sale, **Remove** takes a pair off available stock without counting revenue, and `+` restocks. Each action can be undone. If a sale was recorded by mistake after its toast disappears, Activity has a persistent **Not sold** correction that removes it from reports and revenue without changing current stock. Writes go through a small Google Apps Script you deploy once on your spreadsheet — the published CSV is read-only, so the script is the write path. Changes reach the storefront within seconds.
 
 ### One-time setup (in your Google account)
 
@@ -76,10 +76,11 @@ To change the passcode or token later: update the env vars and redeploy (the scr
 `/admin` has seven tabs:
 
 - **Dashboard** — the landing view: KPI cards (pairs in stock, sold today, order taps today, revenue today), low-stock alerts (≤5 pairs), a dead-stock list (styles never sold in the log), and quick links.
-- **Stock** — the size grid described above. Every `−`/`+` toast carries an **Undo** action that posts the inverse write.
+- **Stock** — the size grid described above. Every stock-change toast carries an **Undo** action that posts the inverse write; use Activity's **Not sold** correction for an older mistaken sale.
 - **Analytics** — 7/14/30-day ranges over the LOG + RECEIPTS + SUBSCRIBERS tabs: daily sold-vs-taps trend, top models sold vs interest, EU-size demand, payment mix, referral-source and area splits, subscriber growth, repeat customers by phone; CSV export on the main tables. Receipt sections need `kind=receipts` in the writer (latest `stock_writer.gs`, New-version redeploy); the panel warns until it's live.
 - **Add style** — create a brand-new style (style code, name, colour, price, category, photo + starting stock per EU size); it writes new rows to the sheet and goes live within ~a minute. Below the form is a **bulk CSV import**: download the template, fill one row per style in Google Sheets or Excel (File → Download → CSV), upload, review the validation preview, and import — bad rows are flagged and skipped, each row reports its own result.
 - **Reports** — a per-day breakdown of pairs marked sold per model, WhatsApp-order "interest" taps (logged when a client taps *Send order on WhatsApp* in their bag), and restocks. Data comes from a `LOG` tab the script auto-creates in the same spreadsheet.
+- **Activity** — the auditable LOG history, including stock changes, taps, admin events, and persistent corrections. A `void sold ...` entry pairs with its original sale so corrected sales do not count toward reports, revenue, leads, or digest totals.
 - **Receipts** — generate a numbered receipt (`PS-0001`, `PS-0002`, …) matching the shop's printed receipt pad: client name (autocomplete from past receipts, repeat-customer badge on a known phone), items (quick-add from live stock), amount with amount-in-words auto-fill, method, area/city, referral source and balance. Receipts are stored in a `RECEIPTS` tab and each gets a public shareable link (`/receipt/PS-0001`) you can send the client via WhatsApp or email — the form's *Send via WhatsApp* button opens the chat with the link, and entering a client email sends them a copy automatically. Interim receipts until ZRA smart invoicing is integrated.
 - **Mailing list** — Petal List subscribers (see below).
 
