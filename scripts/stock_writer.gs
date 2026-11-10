@@ -75,6 +75,7 @@ function doPost(e) {
       return out({ ok: false, error: "unauthorized" });
 
     if (body.action === "voidSale") return voidSale(body, out);
+    if (body.action === "restoreSale") return restoreSale(body, out);
     if (body.action === "updateProduct")
       return updateProduct(body, out);
     if (body.action === "createProduct")
@@ -481,6 +482,51 @@ function voidSale(body, out) {
   }
 }
 
+// Reverses a mistaken "not sold" correction without changing current stock.
+function restoreSale(body, out) {
+  const model = String(body.model || "").trim();
+  const size = String(body.size || "").trim();
+  const targetTs = String(body.targetTs || "").trim();
+  const targetNote = String(body.targetNote || "").trim();
+  if (!model || !size || !targetTs || !targetNote)
+    return out({ ok: false, error: "target sale required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const rows = sheetRows_(SpreadsheetApp.getActiveSpreadsheet(), "LOG");
+    const target = rows.find((r) =>
+      r.action === "sold" &&
+      String(r.model) === model &&
+      String(r.size) === size &&
+      String(r.ts) === targetTs &&
+      String(r.note) === targetNote
+    );
+    if (!target) return out({ ok: false, error: "sale not found" });
+    const marker = "void sold " + target.note;
+    if (!rows.some((r) =>
+      r.action === "void" &&
+      String(r.model) === model &&
+      String(r.size) === size &&
+      String(r.note) === marker
+    ))
+      return out({ ok: false, error: "sale is not corrected" });
+    const restoreMarker = "unvoid sold " + target.ts + " " + target.note;
+    if (rows.some((r) =>
+      r.action === "unvoid" &&
+      String(r.model) === model &&
+      String(r.size) === size &&
+      String(r.note) === restoreMarker
+    ))
+      return out({ ok: false, error: "sale already restored" });
+    if (!appendLog_("unvoid", model, size, restoreMarker))
+      return out({ ok: false, error: "restore failed" });
+    return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
 // ---------- event log ----------
 
 // POST { action: "logEvent", event, model, size?, note? }
@@ -870,6 +916,29 @@ function doGet(e) {
       const dead = new Array(rows.length).fill(false);
       for (let i = rows.length - 1; i >= 0; i--) {
         const u = rows[i];
+        if (dead[i]) continue;
+        if (u.action === "unvoid") {
+          const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+          if (!match) continue;
+          const voidNote = "void " + match[1] + " " + match[3];
+          for (let j = i - 1; j >= 0; j--) {
+            const v = rows[j];
+            if (dead[j] || v.action !== "void" || v.model !== u.model ||
+                String(v.size) !== String(u.size) || String(v.note) !== voidNote) continue;
+            for (let k = j - 1; k >= 0; k--) {
+              const o = rows[k];
+              if (dead[k] || o.action !== match[1]) continue;
+              if (o.model === u.model && String(o.size) === String(u.size) &&
+                  String(o.ts) === match[2] && String(o.note) === match[3]) {
+                dead[j] = true;
+                dead[i] = true;
+                break;
+              }
+            }
+            break;
+          }
+          continue;
+        }
         if (u.action === "void") {
           const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
           if (!match) continue;
@@ -1017,6 +1086,29 @@ function sendRollup_(ss, fromDay, toDay, subject) {
   const dead = new Array(log.length).fill(false);
   for (let i = log.length - 1; i >= 0; i--) {
     const u = log[i];
+    if (dead[i]) continue;
+    if (u.action === "unvoid") {
+      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+      if (!match) continue;
+      const voidNote = "void " + match[1] + " " + match[3];
+      for (let j = i - 1; j >= 0; j--) {
+        const v = log[j];
+        if (dead[j] || v.action !== "void" || v.model !== u.model ||
+            String(v.size) !== String(u.size) || String(v.note) !== voidNote) continue;
+        for (let k = j - 1; k >= 0; k--) {
+          const o = log[k];
+          if (dead[k] || o.action !== match[1]) continue;
+          if (o.model === u.model && String(o.size) === String(u.size) &&
+              String(o.ts) === match[2] && String(o.note) === match[3]) {
+            dead[j] = true;
+            dead[i] = true;
+            break;
+          }
+        }
+        break;
+      }
+      continue;
+    }
     if (u.action === "void") {
       const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
       if (!match) continue;
