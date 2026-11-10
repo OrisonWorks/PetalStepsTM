@@ -70,6 +70,7 @@ const dayOf = (ts: string | number | Date) => String(ts).slice(0, 10);
 const countAction = (r: LogRow): { kind: string; sign: number } => {
   if (r.action !== "undo") return { kind: r.action, sign: 1 };
   const m = String(r.note || "").split("→").map((x) => parseInt(x, 10));
+  if (String(r.note || "").includes("· remove")) return { kind: "remove", sign: -1 };
   return m.length === 2 && m.every((x) => !isNaN(x))
     ? { kind: m[1] > m[0] ? "sold" : "restock", sign: -1 }
     : { kind: "undo", sign: 1 };
@@ -1854,6 +1855,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
 
 const AUDIT_KINDS: Record<string, { label: string; cls: string }> = {
   sold: { label: "Sold", cls: "bg-rose-100 text-rose-600" },
+  remove: { label: "Removed", cls: "bg-amber-100 text-amber-700" },
   restock: { label: "Restock", cls: "bg-emerald-100 text-emerald-700" },
   undo: { label: "Undo", cls: "bg-amber-100 text-amber-700" },
   interest: { label: "Order tap", cls: "bg-sky-100 text-sky-700" },
@@ -1873,7 +1875,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
   const rows = (data?.log || []).slice().reverse();
   const groups: Record<typeof filter, (a: string) => boolean> = {
     all: () => true,
-    stock: (a) => a === "sold" || a === "restock" || a === "undo",
+    stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo",
     taps: (a) => a === "interest",
     admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter", "whatsapp"].includes(a),
   };
@@ -2170,11 +2172,14 @@ export default function AdminPage() {
     setState("login");
   };
 
-  const adjust = async (p: Product, size: number, delta: number, undo = false) => {
+  const adjust = async (p: Product, size: number, delta: number, action?: "remove", undo = false) => {
+    const undoAction = undo ? action : undefined;
     const ok = await ask(
       undo
         ? { title: `Undo the last change on ${p.name} EU ${size}?`, confirmLabel: "Undo" }
-        : delta < 0
+        : action === "remove"
+          ? { title: `Remove ${p.name} EU ${size} from available stock?`, body: `Stock goes from ${p.stock[size] ?? 0} to ${(p.stock[size] ?? 0) - 1}. This will not count as a sale or revenue.`, confirmLabel: "Remove from stock" }
+          : delta < 0
           ? { title: `Mark one ${p.name} EU ${size} as sold?`, body: `Stock goes from ${p.stock[size] ?? 0} to ${(p.stock[size] ?? 0) - 1}.`, confirmLabel: "Mark sold" }
           : { title: `Restock one ${p.name} EU ${size}?`, body: `Stock goes from ${p.stock[size] ?? 0} to ${(p.stock[size] ?? 0) + 1}.`, confirmLabel: "Restock" }
     );
@@ -2185,7 +2190,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/sold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: p.sku, size, delta, undo }),
+        body: JSON.stringify({ sku: p.sku, size, delta, action, undo, undoAction }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) {
@@ -2207,7 +2212,7 @@ export default function AdminPage() {
       // No Undo offered on an undo write — undo-of-undo can't be
       // expressed in the log and would corrupt the net counts.
       toast.success(`${p.name} EU ${size}: ${d.previous} → ${d.count}`,
-        undo ? undefined : { action: { label: "Undo", onClick: () => adjust(p, size, -delta, true) } });
+        undo ? undefined : { action: { label: "Undo", onClick: () => adjust(p, size, -delta, action, true) } });
     } catch {
       toast.error("Update failed");
     } finally {
@@ -2460,6 +2465,15 @@ export default function AdminPage() {
                       className="h-7 w-7 rounded-lg bg-rose-500 font-bold text-white hover:bg-rose-600 disabled:opacity-30"
                     >
                       −
+                    </button>
+                    <button
+                      disabled={busyKey === key || count === 0}
+                      onClick={() => adjust(p, size, -1, "remove")}
+                      title="Remove from available stock without recording a sale"
+                      aria-label={`Remove ${p.name} EU ${size} from available stock`}
+                      className="h-7 rounded-lg bg-amber-100 px-2 text-xs font-bold text-amber-700 hover:bg-amber-200 disabled:opacity-30"
+                    >
+                      Remove
                     </button>
                     <button
                       disabled={busyKey === key}

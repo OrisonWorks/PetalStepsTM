@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   if (!url || !token) {
     return NextResponse.json({ ok: false, error: "Stock writer not configured" }, { status: 503 });
   }
-  const { sku, size, delta, set, undo } = await req.json().catch(() => ({}));
+  const { sku, size, delta, set, action, undo, undoAction } = await req.json().catch(() => ({}));
   const sizeNum = parseInt(size, 10);
   if (typeof sku !== "string" || !sku || !sizeNum) {
     return NextResponse.json({ ok: false, error: "sku and size required" }, { status: 400 });
@@ -22,7 +22,16 @@ export async function POST(req: Request) {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, model: sku, size: sizeNum, delta, set, undo: undo === true }),
+      body: JSON.stringify({
+        token,
+        model: sku,
+        size: sizeNum,
+        delta,
+        set,
+        action: action === "remove" ? "remove" : undefined,
+        undo: undo === true,
+        undoAction: undoAction === "remove" ? "remove" : undefined,
+      }),
       cache: "no-store",
     });
     const data = await res.json().catch(() => ({}));
