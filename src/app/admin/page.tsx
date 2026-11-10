@@ -119,7 +119,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
       continue;
     }
     if (u.r.action === "void") {
-      const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.r.note || ""));
+      const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
       for (let j = i - 1; j >= 0; j--) {
         const o = out[j];
@@ -127,7 +127,8 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
         if (
           o.r.model === u.r.model &&
           String(o.r.size) === String(u.r.size) &&
-          String(o.r.note) === match[2]
+          String(o.r.note) === match[3] &&
+          (!match[2] || String(o.r.ts) === match[2])
         ) {
           o.sign = 0;
           u.sign = 0;
@@ -152,6 +153,26 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
     }
   }
   return out;
+};
+
+const correctedSaleKeys = (rows: LogRow[]) => {
+  const corrected = new Set<string>();
+  const paired = new Set<number>();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const v = rows[i];
+    if (v.action !== "void") continue;
+    const match = /^void sold (?:(\S+) )?(.*)$/.exec(String(v.note || ""));
+    if (!match) continue;
+    for (let j = i - 1; j >= 0; j--) {
+      const o = rows[j];
+      if (paired.has(j) || o.action !== "sold" || o.model !== v.model || String(o.size) !== String(v.size) || String(o.note) !== match[2]) continue;
+      if (match[1] && String(o.ts) !== match[1]) continue;
+      paired.add(j);
+      corrected.add(`${o.model}|${o.size}|${o.ts}`);
+      break;
+    }
+  }
+  return corrected;
 };
 
 function downloadCsv(name: string, headers: string[], rows: (string | number)[][]) {
@@ -1918,7 +1939,9 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
   const { data, loading, reload } = analytics;
   const { ask, dialog } = useConfirm();
   const [filter, setFilter] = useState<"all" | "stock" | "taps" | "admin">("all");
-  const rows = (data?.log || []).slice().reverse();
+  const rawRows = data?.log || [];
+  const rows = rawRows.slice().reverse();
+  const correctedKeys = correctedSaleKeys(rawRows);
   const groups: Record<typeof filter, (a: string) => boolean> = {
     all: () => true,
     stock: (a) => a === "sold" || a === "remove" || a === "restock" || a === "undo" || a === "void" || a === "unvoid",
@@ -2026,7 +2049,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
               {pg.slice.map((r, i) => {
                 const p = bySku.get(r.model);
                 const kind = AUDIT_KINDS[r.action];
-                const corrected = rows.some((v) => v.action === "void" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `void sold ${r.note}`);
+                const corrected = correctedKeys.has(`${r.model}|${r.size}|${r.ts}`);
                 const restored = rows.some((v) => v.action === "unvoid" && v.model === r.model && String(v.size) === String(r.size) && String(v.note) === `unvoid sold ${r.ts} ${r.note}`);
                 return (
                   <tr key={`${r.ts}-${i}`} className="border-t border-rose-50">

@@ -457,22 +457,33 @@ function voidSale(body, out) {
   if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
   try {
     const rows = sheetRows_(SpreadsheetApp.getActiveSpreadsheet(), "LOG");
-    const target = rows.find((r) =>
+    const targetIndex = rows.findIndex((r) =>
       r.action === "sold" &&
       String(r.model) === model &&
       String(r.size) === size &&
       String(r.ts) === targetTs &&
       String(r.note) === targetNote
     );
-    if (!target) return out({ ok: false, error: "sale not found" });
-    const marker = "void sold " + target.note;
-    if (rows.some((r) =>
-      r.action === "void" &&
-      String(r.model) === model &&
-      String(r.size) === size &&
-      String(r.note) === marker
-    ))
+    if (targetIndex < 0) return out({ ok: false, error: "sale not found" });
+    const pairedSales = new Set();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const v = rows[i];
+      if (v.action !== "void" || String(v.model) !== model || String(v.size) !== size) continue;
+      const marker = String(v.note || "");
+      const match = /^void sold (?:(\S+) )?(.*)$/.exec(marker);
+      if (!match) continue;
+      for (let j = i - 1; j >= 0; j--) {
+        const o = rows[j];
+        if (pairedSales.has(j) || o.action !== "sold" || String(o.model) !== model ||
+            String(o.size) !== size || String(o.note) !== match[2]) continue;
+        if (match[1] && String(o.ts) !== match[1]) continue;
+        pairedSales.add(j);
+        break;
+      }
+    }
+    if (pairedSales.has(targetIndex))
       return out({ ok: false, error: "sale already corrected" });
+    const marker = "void sold " + targetTs + " " + targetNote;
     if (!appendLog_("void", model, size, marker))
       return out({ ok: false, error: "correction failed" });
     return out({ ok: true });
@@ -502,12 +513,12 @@ function restoreSale(body, out) {
       String(r.note) === targetNote
     );
     if (!target) return out({ ok: false, error: "sale not found" });
-    const marker = "void sold " + target.note;
+    const marker = "void sold " + target.ts + " " + target.note;
     if (!rows.some((r) =>
       r.action === "void" &&
       String(r.model) === model &&
       String(r.size) === size &&
-      String(r.note) === marker
+      (String(r.note) === marker || String(r.note) === "void sold " + target.note)
     ))
       return out({ ok: false, error: "sale is not corrected" });
     const restoreMarker = "unvoid sold " + target.ts + " " + target.note;
@@ -924,7 +935,8 @@ function doGet(e) {
           for (let j = i - 1; j >= 0; j--) {
             const v = rows[j];
             if (dead[j] || v.action !== "void" || v.model !== u.model ||
-                String(v.size) !== String(u.size) || String(v.note) !== voidNote) continue;
+                String(v.size) !== String(u.size) ||
+                (String(v.note) !== voidNote && String(v.note) !== `void ${match[1]} ${match[2]} ${match[3]}`)) continue;
             for (let k = j - 1; k >= 0; k--) {
               const o = rows[k];
               if (dead[k] || o.action !== match[1]) continue;
@@ -940,12 +952,13 @@ function doGet(e) {
           continue;
         }
         if (u.action === "void") {
-          const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
+          const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.note || ""));
           if (!match) continue;
           for (let j = i - 1; j >= 0; j--) {
             const o = rows[j];
             if (dead[j] || o.action !== match[1]) continue;
-            if (o.model === u.model && String(o.size) === String(u.size) && String(o.note) === match[2]) {
+            if (o.model === u.model && String(o.size) === String(u.size) &&
+                String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
               dead[j] = true;
               dead[i] = true;
               break;
@@ -1094,7 +1107,8 @@ function sendRollup_(ss, fromDay, toDay, subject) {
       for (let j = i - 1; j >= 0; j--) {
         const v = log[j];
         if (dead[j] || v.action !== "void" || v.model !== u.model ||
-            String(v.size) !== String(u.size) || String(v.note) !== voidNote) continue;
+            String(v.size) !== String(u.size) ||
+            (String(v.note) !== voidNote && String(v.note) !== `void ${match[1]} ${match[2]} ${match[3]}`)) continue;
         for (let k = j - 1; k >= 0; k--) {
           const o = log[k];
           if (dead[k] || o.action !== match[1]) continue;
@@ -1110,12 +1124,13 @@ function sendRollup_(ss, fromDay, toDay, subject) {
       continue;
     }
     if (u.action === "void") {
-      const match = /^void (sold|remove|restock) (.*)$/.exec(String(u.note || ""));
+      const match = /^void (sold|remove|restock) (?:(\S+) )?(.*)$/.exec(String(u.note || ""));
       if (!match) continue;
       for (let j = i - 1; j >= 0; j--) {
         const o = log[j];
         if (dead[j] || o.action !== match[1]) continue;
-        if (o.model === u.model && String(o.size) === String(u.size) && String(o.note) === match[2]) {
+        if (o.model === u.model && String(o.size) === String(u.size) &&
+            String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
           dead[j] = true;
           dead[i] = true;
           break;
