@@ -13,6 +13,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-11-09 — Add explicit Drive authorization helper (PR TBD)
+
+- `scripts/stock_writer.gs` now exposes `authorizeDrive()` for the Apps Script editor. Running it once grants the Drive scope and creates/reuses `petalsteps-photos`, avoiding the confusing first-upload `DriveApp` permission error.
+- README stock-admin setup now includes the one-time authorization and redeploy step.
+
 ### 2026-11-09 — Grand-opening banner removed (PR TBD)
 
 - The `SaleBanner` gradient section ("Grand opening · 24 October 2026 · Come celebrate with us in Thompson Park") is deleted — the event passed. The shop's almost-gone filter stays reachable via the filter chips and `?cat=low` deep link.

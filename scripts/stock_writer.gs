@@ -669,6 +669,13 @@ function photoFolder_() {
   return it.hasNext() ? it.next() : DriveApp.createFolder("petalsteps-photos");
 }
 
+// Run once from the Apps Script editor to grant Drive authorization before
+// the web app's first upload. Safe to rerun; it does not create duplicates.
+function authorizeDrive() {
+  const folder = photoFolder_();
+  Logger.log("Drive access is authorized. Folder: " + folder.getName());
+}
+
 // POST { action: "sendNewsletter", subject, html, text? }
 // Sends to every SUBSCRIBERS row. Free Gmail sends ~100 recipients/day —
 // MailApp.getRemainingDailyQuota() gates the loop so a big list degrades
