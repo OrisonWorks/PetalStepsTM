@@ -13,19 +13,24 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
-### 2026-11-10 — Separate sold from removed stock (PR TBD)
+### 2026-11-10 — Separate sold from removed stock ([PR #53](https://github.com/OrisonWorks/PetalStepsTM/pull/53))
 
 - Stock admin now has distinct actions: **Mark sold** decrements inventory and contributes to sales/revenue; **Remove** decrements inventory without creating a sale. Both actions can be undone, and the Activity tab labels removals separately.
 - Removal and undo notes carry a small `· remove` marker so the writer and reports can pair them correctly without changing the existing LOG columns.
 
-### 2026-11-09 — Add explicit Drive authorization helper (PR TBD)
+### 2026-11-09 — Add explicit Drive authorization helper ([PR #52](https://github.com/OrisonWorks/PetalStepsTM/pull/52))
 
 - `scripts/stock_writer.gs` now exposes `authorizeDrive()` for the Apps Script editor. Running it once grants the Drive scope and creates/reuses `petalsteps-photos`, avoiding the confusing first-upload `DriveApp` permission error.
 - README stock-admin setup now includes the one-time authorization and redeploy step.
 
-### 2026-11-09 — Grand-opening banner removed (PR TBD)
+### 2026-11-09 — Grand-opening banner removed ([PR #51](https://github.com/OrisonWorks/PetalStepsTM/pull/51))
 
 - The `SaleBanner` gradient section ("Grand opening · 24 October 2026 · Come celebrate with us in Thompson Park") is deleted — the event passed. The shop's almost-gone filter stays reachable via the filter chips and `?cat=low` deep link.
+
+### 2026-11-10 — Persistent correction for mistaken sale logs ([PR #54](https://github.com/OrisonWorks/PetalStepsTM/pull/54))
+
+- Activity now exposes a persistent **Not sold** action for recorded sale rows. It appends an auditable `void` LOG entry matched by model, size, timestamp, and original note; current stock is unchanged.
+- Reports, revenue, leads, and digest rollups pair `void sold ...` with the original sale, removing the mistaken sale from business totals. The writer rejects duplicate corrections.
 
 ### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
 
