@@ -32,6 +32,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Activity now exposes a persistent **Not sold** action for recorded sale rows. It appends an auditable `void` LOG entry matched by model, size, timestamp, and original note; current stock is unchanged.
 - Reports, revenue, leads, and digest rollups pair `void sold ...` with the original sale, removing the mistaken sale from business totals. The writer rejects duplicate corrections.
 
+### 2026-11-12 — Timestamped and legacy sale correction compatibility ([PRs #56](https://github.com/OrisonWorks/PetalStepsTM/pull/56), [#57](https://github.com/OrisonWorks/PetalStepsTM/pull/57), [#58](https://github.com/OrisonWorks/PetalStepsTM/pull/58), [#59](https://github.com/OrisonWorks/PetalStepsTM/pull/59))
+
+- **Restore sale** appends an auditable `unvoid` event without changing current stock; exact restorations pair by model, size, original sale timestamp, and note.
+- Timestamp-aware parsing distinguishes duplicate sale notes, while legacy `void` and `unvoid` rows without ISO timestamps remain supported for reports and Apps Script rollups.
+
 ### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
 
 - `/api/admin/report` takes `period=day|week|month`; week = the ISO Mon–Sun containing `day`, month = its calendar month. Period ranges pull `n=5000` and filter locally.
