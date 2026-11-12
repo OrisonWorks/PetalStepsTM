@@ -929,7 +929,7 @@ function doGet(e) {
         const u = rows[i];
         if (dead[i]) continue;
         if (u.action === "unvoid") {
-          const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+          const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
           if (!match) continue;
           const voidNote = "void " + match[1] + " " + match[3];
           for (let j = i - 1; j >= 0; j--) {
@@ -941,7 +941,7 @@ function doGet(e) {
               const o = rows[k];
               if (dead[k] || o.action !== match[1]) continue;
               if (o.model === u.model && String(o.size) === String(u.size) &&
-                  String(o.ts) === match[2] && String(o.note) === match[3]) {
+                  String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
                 dead[j] = true;
                 dead[i] = true;
                 break;
@@ -1101,7 +1101,7 @@ function sendRollup_(ss, fromDay, toDay, subject) {
     const u = log[i];
     if (dead[i]) continue;
     if (u.action === "unvoid") {
-      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+      const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
       if (!match) continue;
       const voidNote = "void " + match[1] + " " + match[3];
       for (let j = i - 1; j >= 0; j--) {
@@ -1113,7 +1113,7 @@ function sendRollup_(ss, fromDay, toDay, subject) {
           const o = log[k];
           if (dead[k] || o.action !== match[1]) continue;
           if (o.model === u.model && String(o.size) === String(u.size) &&
-              String(o.ts) === match[2] && String(o.note) === match[3]) {
+              String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
             dead[j] = true;
             dead[i] = true;
             break;

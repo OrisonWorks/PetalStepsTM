@@ -96,7 +96,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
     const u = out[i];
     if (u.sign === 0) continue;
     if (u.r.action === "unvoid") {
-      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.r.note || ""));
+      const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
       const voidNote = `void ${match[1]} ${match[3]}`;
       for (let j = i - 1; j >= 0; j--) {
@@ -107,7 +107,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
           const o = out[k];
           if (o.sign === 0 || o.r.action !== match[1]) continue;
           if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) &&
-              String(o.r.ts) === match[2] && String(o.r.note) === match[3]) {
+              String(o.r.note) === match[3] && (!match[2] || String(o.r.ts) === match[2])) {
             o.sign = 1;
             v.sign = 0;
             u.sign = 0;
