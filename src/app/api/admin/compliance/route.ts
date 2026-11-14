@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   if (!config) return NextResponse.json({ ok: false, error: "Unauthorized or not configured" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   const action = String(body.action || "").trim();
-  const allowed = new Set(["registerReceipt", "syncReceiptRegister", "recordReceiptException", "resolveReceiptException", "closeFilingPeriod", "addFilingEvidence", "recordDailyReconciliation"]);
+  const allowed = new Set(["registerReceipt", "syncReceiptRegister", "recordReceiptException", "resolveReceiptException", "closeFilingPeriod", "addFilingEvidence", "recordDailyReconciliation", "linkSaleReceipt"]);
   if (!allowed.has(action)) return NextResponse.json({ ok: false, error: "Unsupported compliance action" }, { status: 400 });
   try {
     const res = await fetch(config.url, {

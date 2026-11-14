@@ -379,6 +379,7 @@ function ReportsPanel({ products }: { products: Product[] }) {
   const [period, setPeriod] = useState<"day" | "week" | "month">("day");
   const [loadedLabel, setLoadedLabel] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
+  const [saleEvidence, setSaleEvidence] = useState<{ sale_ts: string; model: string; size: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -392,6 +393,8 @@ function ReportsPanel({ products }: { products: Product[] }) {
         return;
       }
       setRows(data.rows || []);
+      const compliance = await fetch("/api/admin/compliance", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+      setSaleEvidence(compliance.saleEvidence || []);
       setLoaded(true);
       setLoadedLabel(p === "day" ? data.from : `${data.from} → ${data.to}`);
     } finally {
@@ -413,11 +416,13 @@ function ReportsPanel({ products }: { products: Product[] }) {
   const revByModel = new Map<string, number>();
   let revenue = 0;
   let missingEvidence = 0;
+  const linkedEvidence = new Set(saleEvidence.map((r) => `${r.sale_ts}|${r.model}|${r.size}`));
   netLogRows(rows).forEach(({ r, kind, sign }) => {
     if (kind === "sold" || kind === "restock" || kind === "interest") {
       net[kind as keyof typeof net] += sign;
       if (kind === "sold") {
-        if (sign > 0 && !/· receipt\s+\S+/i.test(String(r.note || ""))) missingEvidence += sign;
+        if (sign > 0 && !/· receipt\s+\S+/i.test(String(r.note || "")) &&
+          !linkedEvidence.has(`${r.ts}|${r.model}|${r.size}`)) missingEvidence += sign;
         byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
         const rev = sign * salePrice(r, priceBySku);
         revByModel.set(r.model, (revByModel.get(r.model) || 0) + rev);
