@@ -412,10 +412,12 @@ function ReportsPanel({ products }: { products: Product[] }) {
   const priceBySku = useMemo(() => new Map(products.map((p) => [p.sku, p.price])), [products]);
   const revByModel = new Map<string, number>();
   let revenue = 0;
+  let missingEvidence = 0;
   netLogRows(rows).forEach(({ r, kind, sign }) => {
     if (kind === "sold" || kind === "restock" || kind === "interest") {
       net[kind as keyof typeof net] += sign;
       if (kind === "sold") {
+        if (sign > 0 && !/· receipt\s+\S+/i.test(String(r.note || ""))) missingEvidence += sign;
         byModel.set(r.model, (byModel.get(r.model) || 0) + sign);
         const rev = sign * salePrice(r, priceBySku);
         revByModel.set(r.model, (revByModel.get(r.model) || 0) + rev);
@@ -482,7 +484,7 @@ function ReportsPanel({ products }: { products: Product[] }) {
       </div>
       {loaded && (
         <>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-5">
             <div className="rounded-xl bg-rose-50 p-3">
               <strong className="block text-2xl text-rose-600">{net.sold}</strong>
               <span className="text-xs text-stone-500">pairs sold</span>
@@ -499,7 +501,12 @@ function ReportsPanel({ products }: { products: Product[] }) {
               <strong className="block text-2xl text-stone-700">{net.restock}</strong>
               <span className="text-xs text-stone-500">restocks</span>
             </div>
+            <div className={`rounded-xl p-3 ${missingEvidence ? "bg-amber-50" : "bg-emerald-50"}`}>
+              <strong className={`block text-2xl ${missingEvidence ? "text-amber-700" : "text-emerald-600"}`}>{missingEvidence}</strong>
+              <span className="text-xs text-stone-500">sales missing evidence</span>
+            </div>
           </div>
+          {missingEvidence > 0 && <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">New sales require a receipt number. Older sales without one remain visible for cleanup and must be linked or documented before period approval.</p>}
           <div className="overflow-x-auto">
           <table className="min-w-[480px] mt-4 w-full text-sm">
             <thead>
@@ -2301,6 +2308,14 @@ export default function AdminPage() {
   };
 
   const adjust = async (p: Product, size: number, delta: number, action?: "remove", undo = false) => {
+    let receiptNo = "";
+    if (!undo && !action && delta < 0) {
+      receiptNo = window.prompt("Required receipt number for this sale:")?.trim() || "";
+      if (!receiptNo) {
+        toast.error("A receipt number is required to record a sale");
+        return;
+      }
+    }
     const undoAction = undo ? action : undefined;
     const ok = await ask(
       undo
@@ -2318,7 +2333,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/sold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: p.sku, size, delta, action, undo, undoAction }),
+        body: JSON.stringify({ sku: p.sku, size, delta, action, undo, undoAction, receiptNo }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) {

@@ -189,6 +189,8 @@ function doPost(e) {
         body.set != null
           ? Math.max(0, parseInt(body.set, 10) || 0)
           : Math.max(0, current + (body.delta || -1));
+      if (!body.undo && !body.action && next < current && !String(body.receiptNo || "").trim())
+        return out({ ok: false, error: "receipt number required for every sale" });
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);
@@ -204,7 +206,8 @@ function doPost(e) {
             : "restock";
       const note = current + "→" + next +
         (body.undo && body.undoAction === "remove" ? " · remove" : "") +
-        priceSuffix_(data, modelCol, model, priceCol);
+        priceSuffix_(data, modelCol, model, priceCol) +
+        (!body.undo && !body.action && next < current ? " · receipt " + String(body.receiptNo).trim() : "");
       appendLog_(event, model, size, note);
       return out({ ok: true, model, size, previous: current, count: next });
     } finally {
