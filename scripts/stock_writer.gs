@@ -636,6 +636,7 @@ function closeFilingPeriod(body, out) {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
       .map((h) => String(h).trim().toLowerCase());
     const rowIndex = existing.findIndex((r) => String(r.period) === period);
+    const previous = rowIndex >= 0 ? existing[rowIndex] : {};
     const values = {
       period, status, gross_turnover: parseInt(String(f.grossTurnover || "").replace(/[^0-9]/g, ""), 10) || 0,
       receipt_count: parseInt(f.receiptCount, 10) || 0,
@@ -644,7 +645,8 @@ function closeFilingPeriod(body, out) {
       calculated_tax: parseInt(String(f.calculatedTax || "").replace(/[^0-9]/g, ""), 10) || 0,
       approved_by: String(f.approvedBy || ""),
       approved_ts: status === "approved" || status === "submitted" ? new Date() : "",
-      ack_ref: String(f.ackRef || ""), payment_ref: String(f.paymentRef || ""),
+      ack_ref: Object.prototype.hasOwnProperty.call(f, "ackRef") ? String(f.ackRef || "") : String(previous.ack_ref || ""),
+      payment_ref: Object.prototype.hasOwnProperty.call(f, "paymentRef") ? String(f.paymentRef || "") : String(previous.payment_ref || ""),
       notes: String(f.notes || "")
     };
     const row = headers.map((h) => values[h] == null ? "" : values[h]);
