@@ -65,7 +65,7 @@ export function CompliancePanel() {
     const series = new Map<string, number[]>();
     current.forEach((r) => {
       const raw = String(r.receipt_no).trim();
-      const match = /^([^\d]*)(\d+)$/.exec(raw);
+      const match = /^(.*?)(\d+)$/.exec(raw);
       if (!match) return;
       const key = match[1].toUpperCase() || "PHYSICAL";
       const nums = series.get(key) || [];
