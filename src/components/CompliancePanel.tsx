@@ -19,6 +19,7 @@ type PeriodRow = {
 type ComplianceData = {
   register: RegisterRow[]; exceptions: ExceptionRow[]; periods: PeriodRow[];
   evidence: { period: string; type: string; name: string; content_url?: string }[];
+  reconciliations: { date: string; period: string; receipt_total: string; difference: string; status: string; notes?: string }[];
 };
 
 const fieldCls = "w-full rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300";
@@ -42,6 +43,15 @@ export function CompliancePanel() {
   const [ackRef, setAckRef] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
   const [actualTax, setActualTax] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [reconDate, setReconDate] = useState(new Date().toISOString().slice(0, 10));
+  const [cashTotal, setCashTotal] = useState("");
+  const [mobileMoneyTotal, setMobileMoneyTotal] = useState("");
+  const [bankTotal, setBankTotal] = useState("");
+  const [outstandingTotal, setOutstandingTotal] = useState("");
+  const [reconNotes, setReconNotes] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -50,7 +60,7 @@ export function CompliancePanel() {
       const res = await fetch("/api/admin/compliance", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || "Could not load compliance data");
-      setData({ register: json.register || [], exceptions: json.exceptions || [], periods: json.periods || [], evidence: json.evidence || [] });
+      setData({ register: json.register || [], exceptions: json.exceptions || [], periods: json.periods || [], evidence: json.evidence || [], reconciliations: json.reconciliations || [] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load compliance data");
     } finally {
@@ -69,6 +79,7 @@ export function CompliancePanel() {
   }, [period, savedPeriod?.ack_ref, savedPeriod?.payment_ref]);
   const open = data?.exceptions.filter((e) => e.period === period && e.status !== "resolved") || [];
   const gross = current.filter((r) => r.status === "valid").reduce((n, r) => n + (Number(r.amount) || 0), 0);
+  const reconReceipts = data?.register.filter((r) => r.issue_date === reconDate && r.status === "valid").reduce((n, r) => n + (Number(r.amount) || 0), 0) || 0;
   const planningTax = gross > 2500 ? Math.round((gross - 2500) * 0.05) : 0;
   const gaps = useMemo(() => {
     const series = new Map<string, number[]>();
@@ -105,10 +116,47 @@ export function CompliancePanel() {
     e.preventDefault();
     if (!(await ask({ title: `Register receipt ${receiptNo}?`, body: "Receipt numbers are permanent and cannot be reused.", confirmLabel: "Register receipt" }))) return;
     try {
+      let evidenceUrl = "";
+      if (receiptFile) {
+        const encoded = await fileData(receiptFile);
+        const upload = await fetch("/api/admin/upload-photo", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: receiptFile.type, data: encoded }),
+        });
+        const uploadJson = await upload.json().catch(() => ({}));
+        if (!upload.ok || !uploadJson.ok) throw new Error(uploadJson.error || "Could not upload receipt image");
+        evidenceUrl = String(uploadJson.url);
+      }
       await post("registerReceipt", { receiptNo, issueDate, period, status, amount, client, items });
+      if (evidenceUrl) {
+        await post("addFilingEvidence", {
+          period, type: "receipt_image", name: `Receipt ${receiptNo}`, contentUrl: evidenceUrl,
+        });
+      }
       setReceiptNo(""); setIssueDate(""); setAmount(""); setClient(""); setItems("");
+      setReceiptFile(null); setOcrText("");
       toast.success("Receipt registered");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not register receipt"); }
+  };
+
+  const scanReceipt = async () => {
+    if (!receiptFile) return;
+    setOcrLoading(true);
+    try {
+      const encoded = await fileData(receiptFile);
+      const res = await fetch("/api/admin/compliance/ocr", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mime: receiptFile.type, data: encoded }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || "Could not scan receipt");
+      setOcrText(String(json.text || ""));
+      toast.success("OCR draft ready — verify it against the receipt");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not scan receipt");
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const addException = async () => {
@@ -117,6 +165,17 @@ export function CompliancePanel() {
       await post("recordReceiptException", { period, type: "manual_review", severity: "review", details: exception });
       setException(""); toast.success("Exception recorded");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not record exception"); }
+  };
+
+  const saveReconciliation = async () => {
+    try {
+      await post("recordDailyReconciliation", {
+        date: reconDate, period: reconDate.slice(0, 7), receiptTotal: reconReceipts,
+        cashTotal, mobileMoneyTotal, bankTotal, outstandingTotal, notes: reconNotes,
+      });
+      setReconNotes("");
+      toast.success("Daily reconciliation saved");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save reconciliation"); }
   };
 
   const syncReceipts = async () => {
@@ -208,6 +267,11 @@ export function CompliancePanel() {
           <input placeholder="Customer (optional)" value={client} onChange={(e) => setClient(e.target.value)} className={fieldCls} />
           <input inputMode="numeric" placeholder="Amount K" value={amount} onChange={(e) => setAmount(e.target.value)} className={fieldCls} />
           <input placeholder="Item description" value={items} onChange={(e) => setItems(e.target.value)} className={fieldCls} />
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} className={fieldCls} />
+          <button type="button" disabled={!receiptFile || ocrLoading} onClick={() => void scanReceipt()} className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-50">
+            {ocrLoading ? "Scanning…" : "Scan receipt (draft)"}
+          </button>
+          {ocrText && <textarea readOnly value={ocrText} aria-label="OCR draft" className={`${fieldCls} min-h-24 sm:col-span-3`} />}
           <button className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white sm:col-span-3">Register receipt</button>
         </form>
       </div>
@@ -249,10 +313,41 @@ export function CompliancePanel() {
           <div className="mt-4 space-y-1 text-sm text-stone-600">{(data?.periods || []).filter((p) => p.period === period).map((p) => <p key={p.period}>Status: <b>{p.status}</b> · Last saved gross: K{Number(p.gross_turnover || 0).toLocaleString()}</p>)}</div>
         </div>
       </div>
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <h2 className="font-semibold text-stone-800">Daily physical-book reconciliation</h2>
+        <p className="mt-2 text-sm text-stone-500">Receipt total is calculated from valid receipts recorded for the selected date. Differences become exceptions; nothing is silently adjusted.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <input type="date" value={reconDate} onChange={(e) => setReconDate(e.target.value)} className={fieldCls} />
+          <input readOnly value={`Receipt total K${reconReceipts.toLocaleString()}`} className={fieldCls} />
+          <input inputMode="numeric" placeholder="Cash total K" value={cashTotal} onChange={(e) => setCashTotal(e.target.value)} className={fieldCls} />
+          <input inputMode="numeric" placeholder="Mobile money total K" value={mobileMoneyTotal} onChange={(e) => setMobileMoneyTotal(e.target.value)} className={fieldCls} />
+          <input inputMode="numeric" placeholder="Bank total K" value={bankTotal} onChange={(e) => setBankTotal(e.target.value)} className={fieldCls} />
+          <input inputMode="numeric" placeholder="Outstanding balance K" value={outstandingTotal} onChange={(e) => setOutstandingTotal(e.target.value)} className={fieldCls} />
+          <input placeholder="Notes/evidence reference" value={reconNotes} onChange={(e) => setReconNotes(e.target.value)} className={fieldCls} />
+          <button onClick={() => void saveReconciliation()} className="rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Save daily close</button>
+        </div>
+        <div className="mt-3 space-y-1 text-sm text-stone-600">
+          {(data?.reconciliations || []).filter((r) => r.period === period).slice(-5).map((r) => (
+            <p key={`${r.date}-${r.receipt_total}`}>{r.date}: K{Number(r.receipt_total || 0).toLocaleString()} · {r.status} · difference K{Number(r.difference || 0).toLocaleString()}</p>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
 
 function Kpi({ label, value, warn = false }: { label: string; value: string | number; warn?: boolean }) {
   return <div className={`rounded-xl border p-3 ${warn ? "border-amber-200 bg-amber-50" : "border-rose-100 bg-white"}`}><div className="text-xs text-stone-500">{label}</div><div className="mt-1 text-xl font-bold text-stone-800">{value}</div></div>;
+}
+
+function fileData(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = String(reader.result || "");
+      resolve(value.includes(",") ? value.slice(value.indexOf(",") + 1) : value);
+    };
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(file);
+  });
 }

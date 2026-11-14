@@ -260,6 +260,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Recording a submitted period requires the actual TaxOnline tax amount; the planning estimate remains advisory and is not stored as the confirmed liability.
 - The live Apps Script writer must be redeployed as a new version after this change.
 
+### 2026-11-14 — Physical Book Mode
+
+- Compliance now supports physical receipt photo evidence, optional Hugging Face OCR drafts, and daily cash/mobile-money/bank reconciliation.
+- OCR is never authoritative: staff must verify every value against the physical book before registering a receipt.
+- Daily reconciliation records the calculated valid-receipt total and marks unmatched payment totals as exceptions instead of changing receipts or stock.
+
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
 - Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.
