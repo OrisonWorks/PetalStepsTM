@@ -254,6 +254,12 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Apps Script `dailyDigest` + `backupSheet` functions for time-driven triggers: evening sales summary email and daily/weekly CSV backup of every tab (Gmail auth prompt on first trigger run).
 - Security hardening from Devin Review rounds: write locks, global login rate limit, formula-injection escaping, key-guarded receipts, honest logEvent failures (no double-sales).
 
+### 2026-11-14 — Compliance submission handoff (PR #63)
+
+- Compliance close now loads saved TaxOnline acknowledgement/payment references per selected month and preserves them when ordinary review or approval saves omit those fields.
+- Recording a submitted period requires the actual TaxOnline tax amount; the planning estimate remains advisory and is not stored as the confirmed liability.
+- The live Apps Script writer must be redeployed as a new version after this change.
+
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
 - Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.
