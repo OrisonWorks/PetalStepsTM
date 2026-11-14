@@ -76,7 +76,7 @@ export function CompliancePanel() {
     series.forEach((values, key) => {
       const nums = [...new Set(values)].sort((a, b) => a - b);
       for (let n = nums[0]; n <= nums[nums.length - 1]; n++) {
-        if (!nums.includes(n)) out.push(`${key === "PHYSICAL" ? "" : key + "-"}${String(n).padStart(4, "0")}`);
+        if (!nums.includes(n)) out.push(`${key === "PHYSICAL" ? "" : key}${String(n).padStart(4, "0")}`);
       }
     });
     return out;
