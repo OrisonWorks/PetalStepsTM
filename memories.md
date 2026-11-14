@@ -265,6 +265,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Compliance now supports physical receipt photo evidence, optional Hugging Face OCR drafts, and daily cash/mobile-money/bank reconciliation.
 - OCR is never authoritative: staff must verify every value against the physical book before registering a receipt.
 - Daily reconciliation records the calculated valid-receipt total and marks unmatched payment totals as exceptions instead of changing receipts or stock.
+- New stock sales now require a receipt number and stamp it into the sale log; removals remain receipt-free because they are not sales. Sales reports expose older sales missing receipt evidence.
 
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
