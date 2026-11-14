@@ -120,7 +120,11 @@ export function CompliancePanel() {
   };
 
   const exportFilingPack = () => {
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, "\"\"")}"`;
+    const esc = (v: unknown) => {
+      const value = String(v ?? "");
+      const safe = /^[=+\-@]/.test(value) ? "'" + value : value;
+      return `"${safe.replace(/"/g, "\"\"")}"`;
+    };
     const rows = current.map((r) => [r.receipt_no, r.issue_date, r.status, r.client || "", r.amount || "", r.items || "", r.notes || ""].map(esc).join(","));
     const csv = ["receipt_no,issue_date,status,client,amount,items,notes", ...rows].join("\n");
     const download = (name: string, content: string, type: string) => {
