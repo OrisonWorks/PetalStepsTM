@@ -104,6 +104,8 @@ function doPost(e) {
       return addFilingEvidence(body, out);
     if (body.action === "recordDailyReconciliation")
       return recordDailyReconciliation(body, out);
+    if (body.action === "linkSaleReceipt")
+      return linkSaleReceipt(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -484,6 +486,10 @@ function ensureComplianceSheets_(ss) {
     "MOBILE_MONEY_TOTAL", "BANK_TOTAL", "OUTSTANDING_TOTAL",
     "DIFFERENCE", "STATUS", "NOTES", "CREATED_TS"
   ]);
+  getOrCreate_(ss, "SALE_EVIDENCE", [
+    "ID", "SALE_TS", "MODEL", "SIZE", "RECEIPT_NO",
+    "EVIDENCE_URL", "NOTES", "CREATED_TS"
+  ]);
 }
 
 function id_() {
@@ -720,6 +726,35 @@ function recordDailyReconciliation(body, out) {
       safe_(String(f.notes || "")), new Date()
     ]);
     return out({ ok: true, difference });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function linkSaleReceipt(body, out) {
+  const f = body.fields || {};
+  const saleTs = String(f.saleTs || "").trim();
+  const model = String(f.model || "").trim();
+  const size = String(f.size || "").trim();
+  const receiptNo = String(f.receiptNo || "").trim();
+  if (!saleTs || !model || !size || !receiptNo)
+    return out({ ok: false, error: "sale timestamp, model, size, and receipt number required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const existing = sheetRows_(ss, "SALE_EVIDENCE");
+    if (existing.some((r) =>
+      String(r.sale_ts) === saleTs && String(r.model) === model && String(r.size) === size
+    )) return out({ ok: false, error: "sale already has receipt evidence" });
+    appendComplianceRow_(ss, "SALE_EVIDENCE", [
+      "ID", "SALE_TS", "MODEL", "SIZE", "RECEIPT_NO",
+      "EVIDENCE_URL", "NOTES", "CREATED_TS"
+    ], [id_(), safe_(saleTs), safe_(model), safe_(size), safe_(receiptNo),
+      safe_(String(f.evidenceUrl || "")), safe_(String(f.notes || "")), new Date()]);
+    return out({ ok: true });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();
@@ -1208,6 +1243,7 @@ function doGet(e) {
         periods: sheetRows_(ss, "FILING_PERIODS"),
         evidence: sheetRows_(ss, "FILING_EVIDENCE"),
         reconciliations: sheetRows_(ss, "DAILY_RECONCILIATIONS"),
+        saleEvidence: sheetRows_(ss, "SALE_EVIDENCE"),
       });
     }
     if (kind === "leads") {
