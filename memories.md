@@ -267,6 +267,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Daily reconciliation records the calculated valid-receipt total and marks unmatched payment totals as exceptions instead of changing receipts or stock.
 - New stock sales now require a receipt number and stamp it into the sale log; removals remain receipt-free because they are not sales. Sales reports expose older sales missing receipt evidence.
 
+### 2026-11-14 — Historical sale receipt backfill
+
+- Compliance now supports append-only links from a legacy sale timestamp/model/size to a verified receipt number.
+- Backfilling evidence does not change stock, revenue, or original LOG history; Sales Report missing-evidence counts honor these links.
+
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
 - Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.

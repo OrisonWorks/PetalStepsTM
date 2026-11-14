@@ -20,7 +20,9 @@ type ComplianceData = {
   register: RegisterRow[]; exceptions: ExceptionRow[]; periods: PeriodRow[];
   evidence: { period: string; type: string; name: string; content_url?: string }[];
   reconciliations: { date: string; period: string; receipt_total: string; difference: string; status: string; notes?: string }[];
+  saleEvidence: { sale_ts: string; model: string; size: string; receipt_no: string; evidence_url?: string }[];
 };
+type LegacySale = { ts: string; action?: string; model: string; size: string; note: string };
 
 const fieldCls = "w-full rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300";
 const previousPeriod = () => {
@@ -52,6 +54,7 @@ export function CompliancePanel() {
   const [bankTotal, setBankTotal] = useState("");
   const [outstandingTotal, setOutstandingTotal] = useState("");
   const [reconNotes, setReconNotes] = useState("");
+  const [legacySales, setLegacySales] = useState<LegacySale[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -60,7 +63,13 @@ export function CompliancePanel() {
       const res = await fetch("/api/admin/compliance", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || "Could not load compliance data");
-      setData({ register: json.register || [], exceptions: json.exceptions || [], periods: json.periods || [], evidence: json.evidence || [], reconciliations: json.reconciliations || [] });
+      setData({ register: json.register || [], exceptions: json.exceptions || [], periods: json.periods || [], evidence: json.evidence || [], reconciliations: json.reconciliations || [], saleEvidence: json.saleEvidence || [] });
+      const analytics = await fetch("/api/admin/analytics", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+      const linked = new Set((json.saleEvidence || []).map((r: { sale_ts: string; model: string; size: string }) => `${r.sale_ts}|${r.model}|${r.size}`));
+      setLegacySales((analytics.log || []).filter((r: LegacySale) =>
+        r.action === "sold" && !/· receipt\s+\S+/i.test(String(r.note || "")) &&
+        !linked.has(`${r.ts}|${r.model}|${r.size}`)
+      ));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load compliance data");
     } finally {
@@ -176,6 +185,15 @@ export function CompliancePanel() {
       setReconNotes("");
       toast.success("Daily reconciliation saved");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save reconciliation"); }
+  };
+
+  const linkLegacySale = async (sale: LegacySale, receiptNo: string) => {
+    if (!receiptNo.trim()) return;
+    try {
+      await post("linkSaleReceipt", { saleTs: sale.ts, model: sale.model, size: sale.size, receiptNo });
+      setLegacySales((rows) => rows.filter((r) => r !== sale));
+      toast.success("Receipt linked to historical sale");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not link receipt"); }
   };
 
   const syncReceipts = async () => {
@@ -330,6 +348,25 @@ export function CompliancePanel() {
           {(data?.reconciliations || []).filter((r) => r.period === period).slice(-5).map((r) => (
             <p key={`${r.date}-${r.receipt_total}`}>{r.date}: K{Number(r.receipt_total || 0).toLocaleString()} · {r.status} · difference K{Number(r.difference || 0).toLocaleString()}</p>
           ))}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <h2 className="font-semibold text-stone-800">Backfill receipts for older sales</h2>
+        <p className="mt-2 text-sm text-stone-600">These links do not change stock, revenue, or the original sale timestamp. Enter only a receipt verified against the physical book.</p>
+        <div className="mt-3 space-y-2">
+          {legacySales.slice(0, 20).map((sale) => (
+            <div key={`${sale.ts}-${sale.model}-${sale.size}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-sm">
+              <span className="min-w-0 flex-1"><b>{sale.ts}</b> · {sale.model} · EU {sale.size} · {sale.note}</span>
+              <input
+                aria-label={`Receipt for sale ${sale.ts}`}
+                placeholder="Receipt no."
+                className={`${fieldCls} max-w-36`}
+                onKeyDown={(e) => { if (e.key === "Enter") void linkLegacySale(sale, e.currentTarget.value); }}
+              />
+            </div>
+          ))}
+          {!legacySales.length && <p className="text-sm text-emerald-700">No older sales are missing a receipt link.</p>}
+          {legacySales.length > 20 && <p className="text-xs text-stone-500">Showing the first 20; refresh after linking to continue.</p>}
         </div>
       </div>
     </section>
