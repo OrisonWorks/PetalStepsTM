@@ -62,10 +62,23 @@ export function CompliancePanel() {
   const gross = current.filter((r) => r.status === "valid").reduce((n, r) => n + (Number(r.amount) || 0), 0);
   const planningTax = gross > 2500 ? Math.round((gross - 2500) * 0.05) : 0;
   const gaps = useMemo(() => {
-    const nums = current.map((r) => parseInt(String(r.receipt_no).replace(/\D/g, ""), 10)).filter(Boolean).sort((a, b) => a - b);
-    if (!nums.length) return [];
-    const out: number[] = [];
-    for (let n = nums[0]; n <= nums[nums.length - 1]; n++) if (!nums.includes(n)) out.push(n);
+    const series = new Map<string, number[]>();
+    current.forEach((r) => {
+      const raw = String(r.receipt_no).trim();
+      const match = /^(.*?)(\d+)$/.exec(raw);
+      if (!match) return;
+      const key = match[1].toUpperCase() || "PHYSICAL";
+      const nums = series.get(key) || [];
+      nums.push(parseInt(match[2], 10));
+      series.set(key, nums);
+    });
+    const out: string[] = [];
+    series.forEach((values, key) => {
+      const nums = [...new Set(values)].sort((a, b) => a - b);
+      for (let n = nums[0]; n <= nums[nums.length - 1]; n++) {
+        if (!nums.includes(n)) out.push(`${key === "PHYSICAL" ? "" : key}${String(n).padStart(4, "0")}`);
+      }
+    });
     return out;
   }, [current]);
 
@@ -120,7 +133,11 @@ export function CompliancePanel() {
   };
 
   const exportFilingPack = () => {
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, "\"\"")}"`;
+    const esc = (v: unknown) => {
+      const value = String(v ?? "");
+      const safe = /^[=+\-@]/.test(value) ? "'" + value : value;
+      return `"${safe.replace(/"/g, "\"\"")}"`;
+    };
     const rows = current.map((r) => [r.receipt_no, r.issue_date, r.status, r.client || "", r.amount || "", r.items || "", r.notes || ""].map(esc).join(","));
     const csv = ["receipt_no,issue_date,status,client,amount,items,notes", ...rows].join("\n");
     const download = (name: string, content: string, type: string) => {
@@ -188,7 +205,7 @@ export function CompliancePanel() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-rose-100 bg-white p-4">
           <h2 className="font-semibold text-stone-800">Sequence and data-quality warnings</h2>
-          {gaps.length > 0 && <p className="mt-2 text-sm text-amber-700">Missing in registered range: {gaps.map((n) => String(n).padStart(3, "0")).join(", ")}</p>}
+          {gaps.length > 0 && <p className="mt-2 text-sm text-amber-700">Missing within each receipt series: {gaps.join(", ")}</p>}
           {open.length === 0 && gaps.length === 0 ? <p className="mt-2 text-sm text-emerald-700">No open warnings for this period.</p> : null}
           <div className="mt-3 space-y-2">{open.map((e) => <div key={e.id} className="flex items-start justify-between gap-2 rounded-lg bg-amber-50 p-2 text-sm"><span><b>{e.receipt_no || "Period"}</b> · {e.type}: {e.details}</span><button onClick={() => void resolve(e)} className="shrink-0 rounded bg-white px-2 py-1 text-xs font-semibold text-emerald-700">Resolve</button></div>)}</div>
           <div className="mt-3 flex gap-2"><input value={exception} onChange={(e) => setException(e.target.value)} placeholder="Record a verified exception…" className={fieldCls} /><button onClick={() => void addException()} className="rounded-lg bg-stone-800 px-3 py-2 text-sm font-semibold text-white">Add</button></div>

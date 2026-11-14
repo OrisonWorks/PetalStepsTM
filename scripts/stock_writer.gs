@@ -606,6 +606,8 @@ function resolveReceiptException(body, out) {
     const resolvedCol = headers.indexOf("resolved_ts");
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idCol]) !== id) continue;
+      if (String(data[i][statusCol]).toLowerCase() === "resolved")
+        return out({ ok: false, error: "exception already resolved" });
       sheet.getRange(i + 1, statusCol + 1).setValue("resolved");
       sheet.getRange(i + 1, resolutionCol + 1).setValue(safe_(resolution));
       sheet.getRange(i + 1, resolvedCol + 1).setValue(new Date());
