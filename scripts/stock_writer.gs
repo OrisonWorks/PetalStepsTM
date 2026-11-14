@@ -102,6 +102,8 @@ function doPost(e) {
       return closeFilingPeriod(body, out);
     if (body.action === "addFilingEvidence")
       return addFilingEvidence(body, out);
+    if (body.action === "recordDailyReconciliation")
+      return recordDailyReconciliation(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -474,6 +476,11 @@ function ensureComplianceSheets_(ss) {
   getOrCreate_(ss, "FILING_EVIDENCE", [
     "ID", "PERIOD", "TYPE", "NAME", "CONTENT_URL", "CREATED_TS"
   ]);
+  getOrCreate_(ss, "DAILY_RECONCILIATIONS", [
+    "ID", "DATE", "PERIOD", "RECEIPT_TOTAL", "CASH_TOTAL",
+    "MOBILE_MONEY_TOTAL", "BANK_TOTAL", "OUTSTANDING_TOTAL",
+    "DIFFERENCE", "STATUS", "NOTES", "CREATED_TS"
+  ]);
 }
 
 function id_() {
@@ -676,6 +683,40 @@ function addFilingEvidence(body, out) {
       "ID", "PERIOD", "TYPE", "NAME", "CONTENT_URL", "CREATED_TS"
     ], [id_(), safe_(period), safe_(type), safe_(name), safe_(url), new Date()]);
     return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function recordDailyReconciliation(body, out) {
+  const f = body.fields || {};
+  const date = String(f.date || "").trim();
+  const period = period_(f.period);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !period)
+    return out({ ok: false, error: "valid date and period required" });
+  const receiptTotal = Number(f.receiptTotal) || 0;
+  const cashTotal = Number(f.cashTotal) || 0;
+  const mobileMoneyTotal = Number(f.mobileMoneyTotal) || 0;
+  const bankTotal = Number(f.bankTotal) || 0;
+  const outstandingTotal = Number(f.outstandingTotal) || 0;
+  const difference = receiptTotal - cashTotal - mobileMoneyTotal - bankTotal - outstandingTotal;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    appendComplianceRow_(ss, "DAILY_RECONCILIATIONS", [
+      "ID", "DATE", "PERIOD", "RECEIPT_TOTAL", "CASH_TOTAL",
+      "MOBILE_MONEY_TOTAL", "BANK_TOTAL", "OUTSTANDING_TOTAL",
+      "DIFFERENCE", "STATUS", "NOTES", "CREATED_TS"
+    ], [
+      id_(), safe_(date), safe_(period), receiptTotal, cashTotal,
+      mobileMoneyTotal, bankTotal, outstandingTotal, difference,
+      Math.abs(difference) < 0.01 ? "matched" : "exception",
+      safe_(String(f.notes || "")), new Date()
+    ]);
+    return out({ ok: true, difference });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();
@@ -1163,6 +1204,7 @@ function doGet(e) {
         exceptions: sheetRows_(ss, "RECEIPT_EXCEPTIONS"),
         periods: sheetRows_(ss, "FILING_PERIODS"),
         evidence: sheetRows_(ss, "FILING_EVIDENCE"),
+        reconciliations: sheetRows_(ss, "DAILY_RECONCILIATIONS"),
       });
     }
     if (kind === "leads") {
