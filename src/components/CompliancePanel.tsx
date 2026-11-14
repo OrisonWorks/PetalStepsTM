@@ -97,6 +97,52 @@ export function CompliancePanel() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not record exception"); }
   };
 
+  const syncReceipts = async () => {
+    try {
+      const res = await fetch("/api/admin/compliance", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "syncReceiptRegister", fields: {} }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || "Could not sync receipts");
+      await load();
+      toast.success(`${json.added || 0} existing receipts added to the register`);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not sync receipts"); }
+  };
+
+  const resolve = async (row: ExceptionRow) => {
+    const resolution = window.prompt("Verified resolution for this exception:");
+    if (!resolution?.trim()) return;
+    try {
+      await post("resolveReceiptException", { id: row.id, resolution });
+      toast.success("Exception resolved");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not resolve exception"); }
+  };
+
+  const exportFilingPack = () => {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, "\"\"")}"`;
+    const rows = current.map((r) => [r.receipt_no, r.issue_date, r.status, r.client || "", r.amount || "", r.items || "", r.notes || ""].map(esc).join(","));
+    const csv = ["receipt_no,issue_date,status,client,amount,items,notes", ...rows].join("\n");
+    const download = (name: string, content: string, type: string) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([content], { type }));
+      a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    };
+    const memo = `<!doctype html><meta charset="utf-8"><title>Petal Steps filing memo ${period}</title>
+      <style>body{font:14px Arial;max-width:760px;margin:40px auto;color:#332b2b}h1{text-align:center} .line{border-bottom:1px solid #777;display:inline-block;min-width:260px}</style>
+      <h1>Petal Steps — Internal Filing Memo</h1>
+      <p>Date: <span class="line">&nbsp;</span></p>
+      <p>Period: <b>${period}</b></p>
+      <p>Receipt exceptions were reviewed against the available receipt register. The attached ledger is the source for the period review.</p>
+      <p>Gross registered valid receipts: <b>K${gross.toLocaleString()}</b></p>
+      <p>Open exceptions at export: <b>${open.length}</b></p>
+      <p>Missing or unverified receipt pages must not be reconstructed. Attach supporting evidence and record the verified resolution in the Compliance tab.</p>
+      <p>Prepared by: <span class="line">&nbsp;</span></p><p>Signature: <span class="line">&nbsp;</span></p>`;
+    download(`petalsteps-${period}-receipt-ledger.csv`, csv, "text/csv");
+    download(`petalsteps-${period}-filing-memo.html`, memo, "text/html");
+    toast.success("Filing ledger and memo downloaded");
+  };
+
   const closePeriod = async () => {
     if (open.length && !(await ask({ title: "Close period with open exceptions?", body: `${open.length} exception(s) are unresolved. The period will remain reviewable, not approved.`, confirmLabel: "Save review" }))) return;
     try {
@@ -114,6 +160,8 @@ export function CompliancePanel() {
       <div className="flex flex-wrap items-end gap-3">
         <div><label className="text-xs font-semibold text-stone-500">Filing period</label><input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className={fieldCls} /></div>
         <button onClick={() => void load()} className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700">Refresh</button>
+        <button onClick={() => void syncReceipts()} className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700">Sync issued receipts</button>
+        <button onClick={exportFilingPack} className="rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Export filing pack</button>
       </div>
       {loading && <p className="text-sm text-stone-500">Loading compliance records…</p>}
       <div className="grid gap-3 sm:grid-cols-4">
@@ -142,7 +190,7 @@ export function CompliancePanel() {
           <h2 className="font-semibold text-stone-800">Sequence and data-quality warnings</h2>
           {gaps.length > 0 && <p className="mt-2 text-sm text-amber-700">Missing in registered range: {gaps.map((n) => String(n).padStart(3, "0")).join(", ")}</p>}
           {open.length === 0 && gaps.length === 0 ? <p className="mt-2 text-sm text-emerald-700">No open warnings for this period.</p> : null}
-          <div className="mt-3 space-y-2">{open.map((e) => <div key={e.id} className="rounded-lg bg-amber-50 p-2 text-sm"><b>{e.receipt_no || "Period"}</b> · {e.type}: {e.details}</div>)}</div>
+          <div className="mt-3 space-y-2">{open.map((e) => <div key={e.id} className="flex items-start justify-between gap-2 rounded-lg bg-amber-50 p-2 text-sm"><span><b>{e.receipt_no || "Period"}</b> · {e.type}: {e.details}</span><button onClick={() => void resolve(e)} className="shrink-0 rounded bg-white px-2 py-1 text-xs font-semibold text-emerald-700">Resolve</button></div>)}</div>
           <div className="mt-3 flex gap-2"><input value={exception} onChange={(e) => setException(e.target.value)} placeholder="Record a verified exception…" className={fieldCls} /><button onClick={() => void addException()} className="rounded-lg bg-stone-800 px-3 py-2 text-sm font-semibold text-white">Add</button></div>
         </div>
         <div className="rounded-2xl border border-rose-100 bg-white p-4">

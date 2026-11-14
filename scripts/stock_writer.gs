@@ -92,8 +92,12 @@ function doPost(e) {
     if (body.action === "uploadPhoto") return uploadPhoto(body, out);
     if (body.action === "registerReceipt")
       return registerReceipt(body, out);
+    if (body.action === "syncReceiptRegister")
+      return syncReceiptRegister(body, out);
     if (body.action === "recordReceiptException")
       return recordReceiptException(body, out);
+    if (body.action === "resolveReceiptException")
+      return resolveReceiptException(body, out);
     if (body.action === "closeFilingPeriod")
       return closeFilingPeriod(body, out);
     if (body.action === "addFilingEvidence")
@@ -523,6 +527,38 @@ function registerReceipt(body, out) {
   }
 }
 
+function syncReceiptRegister(body, out) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const register = sheetRows_(ss, "RECEIPT_REGISTER");
+    const known = new Set(register.map((r) => String(r.receipt_no)));
+    const receipts = sheetRows_(ss, "RECEIPTS");
+    const sheet = ss.getSheetByName("RECEIPT_REGISTER");
+    let added = 0;
+    receipts.forEach((r) => {
+      const no = String(r.no || "").trim();
+      if (!no || known.has(no)) return;
+      const date = String(r.date || "").slice(0, 10);
+      if (!date) return;
+      sheet.appendRow([
+        id_(), safe_(no), "digital", safe_(date), safe_(date.slice(0, 7)),
+        "valid", safe_(r.client || ""), parseInt(String(r.amount || "").replace(/[^0-9]/g, ""), 10) || 0,
+        safe_(r.items || ""), safe_(r.method || ""), safe_(r.note || ""),
+        new Date(), new Date(), ""
+      ]);
+      known.add(no);
+      added++;
+    });
+    return out({ ok: true, added });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
 function recordReceiptException(body, out) {
   const f = body.fields || {};
   const period = period_(f.period);
@@ -545,6 +581,37 @@ function recordReceiptException(body, out) {
       safe_(f.severity || "review"), safe_(details), "open", "", now, ""
     ]);
     return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function resolveReceiptException(body, out) {
+  const f = body.fields || {};
+  const id = String(f.id || "").trim();
+  const resolution = String(f.resolution || "").trim();
+  if (!id || !resolution) return out({ ok: false, error: "exception id and resolution required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const sheet = ss.getSheetByName("RECEIPT_EXCEPTIONS");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map((h) => String(h).trim().toLowerCase());
+    const idCol = headers.indexOf("id");
+    const statusCol = headers.indexOf("status");
+    const resolutionCol = headers.indexOf("resolution");
+    const resolvedCol = headers.indexOf("resolved_ts");
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) !== id) continue;
+      sheet.getRange(i + 1, statusCol + 1).setValue("resolved");
+      sheet.getRange(i + 1, resolutionCol + 1).setValue(safe_(resolution));
+      sheet.getRange(i + 1, resolvedCol + 1).setValue(new Date());
+      return out({ ok: true });
+    }
+    return out({ ok: false, error: "exception not found" });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();

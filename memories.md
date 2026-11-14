@@ -19,6 +19,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Apps Script now creates and manages `RECEIPT_REGISTER`, `RECEIPT_EXCEPTIONS`, `FILING_PERIODS`, and `FILING_EVIDENCE` tabs.
 - Physical or digital receipts can be registered with permanent statuses (`valid`, `unused`, `void`, `reissued`, `needs_review`); receipt exceptions and filing-period review/approval records are append-only and auditable.
 - The monthly view detects registered sequence gaps, calculates a clearly labelled planning figure using the K2,500-above method, and warns that TaxOnline/accountant confirmation remains required.
+- Existing digital receipts can be synchronized into the compliance register; verified exceptions can be resolved with an explanation; the period view exports a receipt ledger CSV and printable filing memo.
 
 ### 2026-11-10 — Separate sold from removed stock ([PR #53](https://github.com/OrisonWorks/PetalStepsTM/pull/53))
 
