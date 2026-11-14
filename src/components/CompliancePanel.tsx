@@ -39,6 +39,8 @@ export function CompliancePanel() {
   const [items, setItems] = useState("");
   const [status, setStatus] = useState("valid");
   const [exception, setException] = useState("");
+  const [ackRef, setAckRef] = useState("");
+  const [paymentRef, setPaymentRef] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -167,6 +169,7 @@ export function CompliancePanel() {
         period, status: open.length ? "review" : "approved", grossTurnover: gross,
         receiptCount: current.length, exceptionCount: open.length, calculatedTax: planningTax,
         taxMethod: "5% above K2,500 planning method", approvedBy: open.length ? "" : "Admin review",
+        ackRef, paymentRef,
       });
       toast.success(open.length ? "Period saved for review" : "Period approved");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save period"); }
@@ -214,6 +217,27 @@ export function CompliancePanel() {
           <h2 className="font-semibold text-stone-800">Monthly close</h2>
           <p className="mt-2 text-sm text-stone-500">Save a review when evidence is incomplete. Approve only after every exception is resolved.</p>
           <button onClick={() => void closePeriod()} className="mt-4 rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white">{open.length ? "Save period for review" : "Approve period"}</button>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <input placeholder="TaxOnline acknowledgement ref." value={ackRef} onChange={(e) => setAckRef(e.target.value)} className={fieldCls} />
+            <input placeholder="Payment reference" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} className={fieldCls} />
+          </div>
+          <button
+            onClick={async () => {
+              if (open.length) { toast.error("Resolve all open exceptions before recording submission"); return; }
+              if (!ackRef.trim() || !paymentRef.trim()) { toast.error("Enter both TaxOnline and payment references"); return; }
+              try {
+                await post("closeFilingPeriod", {
+                  period, status: "submitted", grossTurnover: gross, receiptCount: current.length,
+                  exceptionCount: open.length, calculatedTax: planningTax,
+                  taxMethod: "TaxOnline confirmed", approvedBy: "Admin review", ackRef, paymentRef,
+                });
+                toast.success("Submission references recorded");
+              } catch (e) { toast.error(e instanceof Error ? e.message : "Could not record submission"); }
+            }}
+            className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Record TaxOnline submission
+          </button>
           <div className="mt-4 space-y-1 text-sm text-stone-600">{(data?.periods || []).filter((p) => p.period === period).map((p) => <p key={p.period}>Status: <b>{p.status}</b> · Last saved gross: K{Number(p.gross_turnover || 0).toLocaleString()}</p>)}</div>
         </div>
       </div>
