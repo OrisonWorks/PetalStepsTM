@@ -9,6 +9,7 @@ import { waLink } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Pager, usePager } from "@/components/Pager";
+import { CompliancePanel } from "@/components/CompliancePanel";
 
 const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
 
@@ -2239,7 +2240,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "hidden" | "matte" | "glossy" | "statement" | "red-bottom">("all");
-  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "compliance" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
@@ -2453,7 +2454,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads", "activity"] as const).map((v) => (
+        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "compliance", "list", "newsletter", "leads", "activity"] as const).map((v) => (
           <button
             key={v}
             onClick={() => goView(v)}
@@ -2493,6 +2494,7 @@ export default function AdminPage() {
       )}
       {view === "reports" && <div className="mt-6"><ReportsPanel products={products} /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
+      {view === "compliance" && <div className="mt-6"><CompliancePanel /></div>}
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
       {view === "newsletter" && <div className="mt-6"><NewsletterPanel products={products} /></div>}
       {view === "leads" && <div className="mt-6"><LeadsPanel products={products} /></div>}

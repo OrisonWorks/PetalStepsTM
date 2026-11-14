@@ -6,7 +6,7 @@ import { after } from "next/server";
 // effort — a stale writer that rejects the event name just skips the row;
 // failures are swallowed so an audit miss never fails the real write.
 export function auditWrite(
-  event: "edit" | "create" | "receipt" | "unsubscribe",
+  event: "edit" | "create" | "receipt" | "unsubscribe" | "compliance",
   model: string,
   note: string
 ) {
