@@ -13,6 +13,13 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-11-14 — Compliance & Filing foundation
+
+- Added the admin **Compliance** tab and `/api/admin/compliance` route.
+- Apps Script now creates and manages `RECEIPT_REGISTER`, `RECEIPT_EXCEPTIONS`, `FILING_PERIODS`, and `FILING_EVIDENCE` tabs.
+- Physical or digital receipts can be registered with permanent statuses (`valid`, `unused`, `void`, `reissued`, `needs_review`); receipt exceptions and filing-period review/approval records are append-only and auditable.
+- The monthly view detects registered sequence gaps, calculates a clearly labelled planning figure using the K2,500-above method, and warns that TaxOnline/accountant confirmation remains required.
+
 ### 2026-11-10 — Separate sold from removed stock ([PR #53](https://github.com/OrisonWorks/PetalStepsTM/pull/53))
 
 - Stock admin now has distinct actions: **Mark sold** decrements inventory and contributes to sales/revenue; **Remove** decrements inventory without creating a sale. Both actions can be undone, and the Activity tab labels removals separately.
@@ -31,6 +38,11 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 - Activity now exposes a persistent **Not sold** action for recorded sale rows. It appends an auditable `void` LOG entry matched by model, size, timestamp, and original note; current stock is unchanged.
 - Reports, revenue, leads, and digest rollups pair `void sold ...` with the original sale, removing the mistaken sale from business totals. The writer rejects duplicate corrections.
+
+### 2026-11-12 — Timestamped and legacy sale correction compatibility ([PRs #56](https://github.com/OrisonWorks/PetalStepsTM/pull/56), [#57](https://github.com/OrisonWorks/PetalStepsTM/pull/57), [#58](https://github.com/OrisonWorks/PetalStepsTM/pull/58), [#59](https://github.com/OrisonWorks/PetalStepsTM/pull/59))
+
+- **Restore sale** appends an auditable `unvoid` event without changing current stock; exact restorations pair by model, size, original sale timestamp, and note.
+- Timestamp-aware parsing distinguishes duplicate sale notes, while legacy `void` and `unvoid` rows without ISO timestamps remain supported for reports and Apps Script rollups.
 
 ### 2026-10-30 — Reports v2: week/month rollups + digest emails (PR #49)
 

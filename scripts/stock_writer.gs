@@ -90,6 +90,14 @@ function doPost(e) {
     if (body.action === "unsubscribe")
       return unsubscribeEmail(body, out);
     if (body.action === "uploadPhoto") return uploadPhoto(body, out);
+    if (body.action === "registerReceipt")
+      return registerReceipt(body, out);
+    if (body.action === "recordReceiptException")
+      return recordReceiptException(body, out);
+    if (body.action === "closeFilingPeriod")
+      return closeFilingPeriod(body, out);
+    if (body.action === "addFilingEvidence")
+      return addFilingEvidence(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -444,6 +452,165 @@ function sheetRows_(ss, name) {
   return rows;
 }
 
+function ensureComplianceSheets_(ss) {
+  getOrCreate_(ss, "RECEIPT_REGISTER", [
+    "ID", "RECEIPT_NO", "SOURCE", "ISSUE_DATE", "PERIOD", "STATUS",
+    "CLIENT", "AMOUNT", "ITEMS", "PAYMENT_METHOD", "NOTES",
+    "CREATED_TS", "UPDATED_TS", "EVIDENCE_URL"
+  ]);
+  getOrCreate_(ss, "RECEIPT_EXCEPTIONS", [
+    "ID", "PERIOD", "RECEIPT_NO", "TYPE", "SEVERITY", "DETAILS",
+    "STATUS", "RESOLUTION", "CREATED_TS", "RESOLVED_TS"
+  ]);
+  getOrCreate_(ss, "FILING_PERIODS", [
+    "PERIOD", "STATUS", "GROSS_TURNOVER", "RECEIPT_COUNT",
+    "EXCEPTION_COUNT", "TAX_METHOD", "CALCULATED_TAX",
+    "APPROVED_BY", "APPROVED_TS", "ACK_REF", "PAYMENT_REF", "NOTES"
+  ]);
+  getOrCreate_(ss, "FILING_EVIDENCE", [
+    "ID", "PERIOD", "TYPE", "NAME", "CONTENT_URL", "CREATED_TS"
+  ]);
+}
+
+function id_() {
+  return Utilities.getUuid().replace(/-/g, "").slice(0, 16);
+}
+
+function period_(value) {
+  const p = String(value || "").trim();
+  return /^\d{4}-\d{2}$/.test(p) ? p : "";
+}
+
+function appendComplianceRow_(ss, name, headers, values) {
+  const sheet = getOrCreate_(ss, name, headers);
+  sheet.appendRow(values);
+  return true;
+}
+
+function registerReceipt(body, out) {
+  const f = body.fields || {};
+  const no = String(f.receiptNo || "").trim();
+  const date = String(f.issueDate || "").trim();
+  const period = period_(f.period || date.slice(0, 7));
+  const status = String(f.status || "valid").trim();
+  const amount = parseInt(String(f.amount || "").replace(/[^0-9]/g, ""), 10) || 0;
+  if (!no || !date || !period)
+    return out({ ok: false, error: "receipt number, issue date and period required" });
+  if (!["valid", "unused", "void", "reissued", "needs_review"].includes(status))
+    return out({ ok: false, error: "invalid receipt status" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const rows = sheetRows_(ss, "RECEIPT_REGISTER");
+    if (rows.some((r) => String(r.receipt_no) === no))
+      return out({ ok: false, error: "receipt already registered" });
+    const now = new Date();
+    appendComplianceRow_(ss, "RECEIPT_REGISTER", [
+      "ID", "RECEIPT_NO", "SOURCE", "ISSUE_DATE", "PERIOD", "STATUS",
+      "CLIENT", "AMOUNT", "ITEMS", "PAYMENT_METHOD", "NOTES",
+      "CREATED_TS", "UPDATED_TS", "EVIDENCE_URL"
+    ], [
+      id_(), safe_(no), safe_(f.source || "physical"), safe_(date), safe_(period),
+      safe_(status), safe_(f.client || ""), amount, safe_(f.items || ""),
+      safe_(f.method || ""), safe_(f.notes || ""), now, now, safe_(f.evidenceUrl || "")
+    ]);
+    return out({ ok: true, receiptNo: no });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function recordReceiptException(body, out) {
+  const f = body.fields || {};
+  const period = period_(f.period);
+  const receiptNo = String(f.receiptNo || "").trim();
+  const type = String(f.type || "").trim();
+  const details = String(f.details || "").trim();
+  if (!period || !type || !details)
+    return out({ ok: false, error: "period, type and details required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const now = new Date();
+    appendComplianceRow_(ss, "RECEIPT_EXCEPTIONS", [
+      "ID", "PERIOD", "RECEIPT_NO", "TYPE", "SEVERITY", "DETAILS",
+      "STATUS", "RESOLUTION", "CREATED_TS", "RESOLVED_TS"
+    ], [
+      id_(), safe_(period), safe_(receiptNo), safe_(type),
+      safe_(f.severity || "review"), safe_(details), "open", "", now, ""
+    ]);
+    return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function closeFilingPeriod(body, out) {
+  const f = body.fields || {};
+  const period = period_(f.period);
+  const status = String(f.status || "review").trim();
+  if (!period || !["review", "approved", "submitted"].includes(status))
+    return out({ ok: false, error: "valid period and status required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const existing = sheetRows_(ss, "FILING_PERIODS");
+    const sheet = ss.getSheetByName("FILING_PERIODS");
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map((h) => String(h).trim().toLowerCase());
+    const rowIndex = existing.findIndex((r) => String(r.period) === period);
+    const values = {
+      period, status, gross_turnover: parseInt(String(f.grossTurnover || "").replace(/[^0-9]/g, ""), 10) || 0,
+      receipt_count: parseInt(f.receiptCount, 10) || 0,
+      exception_count: parseInt(f.exceptionCount, 10) || 0,
+      tax_method: String(f.taxMethod || "manual_review"),
+      calculated_tax: parseInt(String(f.calculatedTax || "").replace(/[^0-9]/g, ""), 10) || 0,
+      approved_by: String(f.approvedBy || ""),
+      approved_ts: status === "approved" || status === "submitted" ? new Date() : "",
+      ack_ref: String(f.ackRef || ""), payment_ref: String(f.paymentRef || ""),
+      notes: String(f.notes || "")
+    };
+    const row = headers.map((h) => values[h] == null ? "" : values[h]);
+    if (rowIndex >= 0) sheet.getRange(rowIndex + 2, 1, 1, row.length).setValues([row]);
+    else sheet.appendRow(row);
+    return out({ ok: true, period, status });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function addFilingEvidence(body, out) {
+  const f = body.fields || {};
+  const period = period_(f.period);
+  const name = String(f.name || "").trim();
+  const type = String(f.type || "document").trim();
+  const url = String(f.contentUrl || "").trim();
+  if (!period || !name)
+    return out({ ok: false, error: "period and evidence name required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    appendComplianceRow_(ss, "FILING_EVIDENCE", [
+      "ID", "PERIOD", "TYPE", "NAME", "CONTENT_URL", "CREATED_TS"
+    ], [id_(), safe_(period), safe_(type), safe_(name), safe_(url), new Date()]);
+    return out({ ok: true });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
 // Corrects a mistakenly recorded sale after the short-lived stock toast has
 // disappeared. This is a log correction only: current stock is unchanged.
 function voidSale(body, out) {
@@ -547,7 +714,7 @@ function restoreSale(body, out) {
 function logEvent(body, out) {
   const event = String(body.event || "").trim();
   const model = String(body.model || "").trim();
-  if (!["interest", "sold", "restock", "edit", "create", "receipt", "unsubscribe", "whatsapp"].includes(event))
+  if (!["interest", "sold", "restock", "edit", "create", "receipt", "unsubscribe", "compliance", "whatsapp"].includes(event))
     return out({ ok: false, error: "unknown event" });
   if (!model) return out({ ok: false, error: "model required" });
   const lock = LockService.getScriptLock();
@@ -917,6 +1084,16 @@ function doGet(e) {
       });
       return out({ ok: true, receipts: rows });
     }
+    if (kind === "compliance") {
+      ensureComplianceSheets_(ss);
+      return out({
+        ok: true,
+        register: sheetRows_(ss, "RECEIPT_REGISTER"),
+        exceptions: sheetRows_(ss, "RECEIPT_EXCEPTIONS"),
+        periods: sheetRows_(ss, "FILING_PERIODS"),
+        evidence: sheetRows_(ss, "FILING_EVIDENCE"),
+      });
+    }
     if (kind === "leads") {
       // Order taps (interest) never followed by a sale of the same
       // model+size — unfilled demand worth a follow-up or a restock.
@@ -929,7 +1106,7 @@ function doGet(e) {
         const u = rows[i];
         if (dead[i]) continue;
         if (u.action === "unvoid") {
-          const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+          const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
           if (!match) continue;
           const voidNote = "void " + match[1] + " " + match[3];
           for (let j = i - 1; j >= 0; j--) {
@@ -941,7 +1118,7 @@ function doGet(e) {
               const o = rows[k];
               if (dead[k] || o.action !== match[1]) continue;
               if (o.model === u.model && String(o.size) === String(u.size) &&
-                  String(o.ts) === match[2] && String(o.note) === match[3]) {
+                  String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
                 dead[j] = true;
                 dead[i] = true;
                 break;
@@ -1101,7 +1278,7 @@ function sendRollup_(ss, fromDay, toDay, subject) {
     const u = log[i];
     if (dead[i]) continue;
     if (u.action === "unvoid") {
-      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.note || ""));
+      const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.note || ""));
       if (!match) continue;
       const voidNote = "void " + match[1] + " " + match[3];
       for (let j = i - 1; j >= 0; j--) {
@@ -1113,7 +1290,7 @@ function sendRollup_(ss, fromDay, toDay, subject) {
           const o = log[k];
           if (dead[k] || o.action !== match[1]) continue;
           if (o.model === u.model && String(o.size) === String(u.size) &&
-              String(o.ts) === match[2] && String(o.note) === match[3]) {
+              String(o.note) === match[3] && (!match[2] || String(o.ts) === match[2])) {
             dead[j] = true;
             dead[i] = true;
             break;

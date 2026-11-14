@@ -9,6 +9,7 @@ import { waLink } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Pager, usePager } from "@/components/Pager";
+import { CompliancePanel } from "@/components/CompliancePanel";
 
 const CATEGORIES = ["matte", "glossy", "statement", "red-bottom"] as const;
 
@@ -96,7 +97,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
     const u = out[i];
     if (u.sign === 0) continue;
     if (u.r.action === "unvoid") {
-      const match = /^unvoid (sold|remove|restock) (\S+) (.*)$/.exec(String(u.r.note || ""));
+      const match = /^unvoid (sold|remove|restock) (?:(\d{4}-\d{2}-\d{2}T\S+) )?(.*)$/.exec(String(u.r.note || ""));
       if (!match) continue;
       const voidNote = `void ${match[1]} ${match[3]}`;
       for (let j = i - 1; j >= 0; j--) {
@@ -107,7 +108,7 @@ const netLogRows = (rows: LogRow[]): NetRow[] => {
           const o = out[k];
           if (o.sign === 0 || o.r.action !== match[1]) continue;
           if (o.r.model === u.r.model && String(o.r.size) === String(u.r.size) &&
-              String(o.r.ts) === match[2] && String(o.r.note) === match[3]) {
+              String(o.r.note) === match[3] && (!match[2] || String(o.r.ts) === match[2])) {
             o.sign = 1;
             v.sign = 0;
             u.sign = 0;
@@ -2239,7 +2240,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "hidden" | "matte" | "glossy" | "statement" | "red-bottom">("all");
-  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "compliance" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
@@ -2453,7 +2454,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "list", "newsletter", "leads", "activity"] as const).map((v) => (
+        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "compliance", "list", "newsletter", "leads", "activity"] as const).map((v) => (
           <button
             key={v}
             onClick={() => goView(v)}
@@ -2493,6 +2494,7 @@ export default function AdminPage() {
       )}
       {view === "reports" && <div className="mt-6"><ReportsPanel products={products} /></div>}
       {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
+      {view === "compliance" && <div className="mt-6"><CompliancePanel /></div>}
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
       {view === "newsletter" && <div className="mt-6"><NewsletterPanel products={products} /></div>}
       {view === "leads" && <div className="mt-6"><LeadsPanel products={products} /></div>}
