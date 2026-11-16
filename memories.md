@@ -13,6 +13,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 ## Changelog
 
+### 2026-11-16 — Preserve decimal TaxOnline amounts
+
+- Filing-period storage now preserves decimal TaxOnline amounts such as K123.45 instead of stripping the decimal and recording K12,345.
+
 ### 2026-11-14 — Compliance & Filing foundation
 
 - Added the admin **Compliance** tab and `/api/admin/compliance` route.
