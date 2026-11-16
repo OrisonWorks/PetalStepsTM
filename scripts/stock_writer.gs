@@ -653,12 +653,16 @@ function closeFilingPeriod(body, out) {
       .map((h) => String(h).trim().toLowerCase());
     const rowIndex = existing.findIndex((r) => String(r.period) === period);
     const previous = rowIndex >= 0 ? existing[rowIndex] : {};
+    const calculatedTaxRaw = String(f.calculatedTax || "").replace(/,/g, "").trim();
+    const calculatedTax = calculatedTaxRaw === ""
+      ? 0
+      : Number(calculatedTaxRaw.replace(/[^0-9.-]/g, ""));
     const values = {
       period, status, gross_turnover: parseInt(String(f.grossTurnover || "").replace(/[^0-9]/g, ""), 10) || 0,
       receipt_count: parseInt(f.receiptCount, 10) || 0,
       exception_count: parseInt(f.exceptionCount, 10) || 0,
       tax_method: String(f.taxMethod || "manual_review"),
-      calculated_tax: parseInt(String(f.calculatedTax || "").replace(/[^0-9]/g, ""), 10) || 0,
+      calculated_tax: Number.isFinite(calculatedTax) && calculatedTax >= 0 ? calculatedTax : 0,
       approved_by: String(f.approvedBy || ""),
       approved_ts: status === "approved" || status === "submitted" ? new Date() : "",
       ack_ref: Object.prototype.hasOwnProperty.call(f, "ackRef") ? String(f.ackRef || "") : String(previous.ack_ref || ""),
