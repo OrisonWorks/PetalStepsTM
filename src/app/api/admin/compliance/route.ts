@@ -20,6 +20,15 @@ export async function GET() {
       { cache: "no-store" }
     );
     const data = await res.json().catch(() => ({}));
+    if (data.error === "unknown kind") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "The Apps Script writer is outdated. Deploy the latest stock_writer.gs as a new version.",
+        },
+        { status: 502 }
+      );
+    }
     return NextResponse.json(data, { status: data.ok ? 200 : 502 });
   } catch {
     return NextResponse.json({ ok: false, error: "Writer unreachable" }, { status: 502 });

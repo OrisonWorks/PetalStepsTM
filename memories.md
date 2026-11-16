@@ -280,6 +280,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 - Scheduled digest emails now prefer the comma-separated `REPORT_EMAILS` Apps Script property, while preserving the legacy `REPORT_EMAIL` fallback.
 
+### 2026-11-16 — Compliance writer deployment diagnostic
+
+- The Compliance API now converts an outdated Apps Script `unknown kind` response into an actionable message instructing the administrator to deploy the latest `stock_writer.gs` as a new version.
+
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
 - Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.
