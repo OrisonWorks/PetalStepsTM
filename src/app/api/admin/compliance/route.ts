@@ -47,9 +47,14 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: config.token, action, fields: body.fields || {} }),
+      redirect: "manual",
       cache: "no-store",
     });
-    const data = await res.json().catch(() => ({}));
+    const location = res.headers.get("location");
+    const result = res.status >= 300 && res.status < 400 && location
+      ? await fetch(new URL(location, config.url), { cache: "no-store" })
+      : res;
+    const data = await result.json().catch(() => ({}));
     if (!data.ok) return NextResponse.json(data, { status: 502 });
     auditWrite("compliance", "-", `${action} · ${body.fields?.period || body.fields?.receiptNo || ""}`);
     return NextResponse.json(data);
