@@ -280,6 +280,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 
 - Scheduled digest emails now prefer the comma-separated `REPORT_EMAILS` Apps Script property, while preserving the legacy `REPORT_EMAIL` fallback.
 - Admin now has a Digest tab to configure recipients, enable or disable the daily trigger, and send an explicitly confirmed test email without opening Apps Script.
+- Digest trigger updates are serialized with a script lock so concurrent settings saves cannot create duplicate daily triggers.
 
 ### 2026-11-16 — Compliance writer deployment diagnostic
 
