@@ -96,7 +96,7 @@ Two scheduled functions live in `stock_writer.gs`. Install them once:
 
    Easier: run `installTriggers()` once from the editor — it (re)creates `dailyDigest` (daily ~21:00), `weeklyDigest` (Sunday ~20:00), `monthlyDigest` (1st ~08:00) and `backupSheet` (Sunday ~06:00).
    - `backupSheet` → **Time-driven** → **Week timer** (or Day timer for daily backups) → pick a time. Emails every tab as CSV attachments.
-2. Both email the address in Script Property `REPORT_EMAIL` if set, otherwise the script owner's Gmail. Add `REPORT_EMAIL` under Script Properties to override.
+2. All digest emails use the comma-separated Script Property `REPORT_EMAILS` if set, otherwise the legacy `REPORT_EMAIL`, otherwise the script owner's Gmail. For multiple recipients, set `REPORT_EMAILS` to `tumelodanmwaba@gmail.com,sipho94@gmail.com,guuysensei@gmail.com` under **Project Settings → Script properties**.
 3. First run asks for Gmail/send-mail authorization — approve once.
 
 ### WhatsApp Cloud API (optional upgrade)
