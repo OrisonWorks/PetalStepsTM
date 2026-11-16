@@ -1599,6 +1599,7 @@ function backupSheet() {
 
 function reportEmail_() {
   return (
+    PropertiesService.getScriptProperties().getProperty("REPORT_EMAILS") ||
     PropertiesService.getScriptProperties().getProperty("REPORT_EMAIL") ||
     Session.getActiveUser().getEmail()
   );

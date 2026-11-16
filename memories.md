@@ -272,6 +272,10 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Compliance now supports append-only links from a legacy sale timestamp/model/size to a verified receipt number.
 - Backfilling evidence does not change stock, revenue, or original LOG history; Sales Report missing-evidence counts honor these links.
 
+### 2026-11-16 — Multi-recipient daily digest
+
+- Scheduled digest emails now prefer the comma-separated `REPORT_EMAILS` Apps Script property, while preserving the legacy `REPORT_EMAIL` fallback.
+
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
 - Storefront reads live stock from the published stock-take CSV (`MODEL/SIZE/COUNT` rows), falling back to `src/lib/products.ts` when the sheet is unreachable.
