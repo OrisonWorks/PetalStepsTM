@@ -279,6 +279,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 ### 2026-11-16 — Multi-recipient daily digest
 
 - Scheduled digest emails now prefer the comma-separated `REPORT_EMAILS` Apps Script property, while preserving the legacy `REPORT_EMAIL` fallback.
+- Admin now has a Digest tab to configure recipients, enable or disable the daily trigger, and send an explicitly confirmed test email without opening Apps Script.
 
 ### 2026-11-16 — Compliance writer deployment diagnostic
 

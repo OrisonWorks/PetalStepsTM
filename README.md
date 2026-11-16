@@ -73,7 +73,7 @@ To change the passcode or token later: update the env vars and redeploy (the scr
 
 ### Reports, receipts and backups
 
-`/admin` has seven tabs:
+`/admin` has the following tabs:
 
 - **Dashboard** — the landing view: KPI cards (pairs in stock, sold today, order taps today, revenue today), low-stock alerts (≤5 pairs), a dead-stock list (styles never sold in the log), and quick links.
 - **Stock** — the size grid described above. Every stock-change toast carries an **Undo** action that posts the inverse write; use Activity's **Not sold** correction for an older mistaken sale.
@@ -85,11 +85,14 @@ To change the passcode or token later: update the env vars and redeploy (the scr
 - **Compliance** — the admin **compliance** tab keeps an append-only `RECEIPT_REGISTER`, `RECEIPT_EXCEPTIONS`, `FILING_PERIODS`, `FILING_EVIDENCE`, and `DAILY_RECONCILIATIONS` record beside the operational receipts. Sync existing digital receipts, register physical receipts, attach receipt photos, optionally scan a photo for an OCR draft, record verified gaps or data-quality issues, resolve exceptions with an explanation, reconcile each day's cash/mobile-money/bank totals, review gross turnover, export the ledger plus memo, save a period for review, and approve it only after exceptions are resolved. OCR is advisory only and requires human confirmation; receipt photos are stored as evidence. The planning tax figure is advisory; enter the actual TaxOnline amount before recording submission and payment references. The writer creates these tabs automatically on first use.
 - **Sale evidence requirement** — every new `sold` stock action requires a physical/digital receipt number, which is stamped into the immutable sale log. Sales reports show a count of older sales missing receipt evidence; `remove` actions do not require a receipt because they are not sales. One receipt number may be used for multiple shoes in a multi-item sale.
 - **Historical sale backfill** — Compliance lists older sold rows without receipt evidence and lets an admin link a verified receipt number to the exact sale timestamp/model/size. The append-only link changes no stock, revenue, or original log row.
+- **Digest** — configure comma-separated sales-digest recipients, enable or disable the daily trigger, and send a deliberate test email from the UI. Saving this tab updates the Apps Script `REPORT_EMAILS` property; the test sends a real email to every configured recipient.
 - **Mailing list** — Petal List subscribers (see below).
 
-### Daily email digest + sheet backup (one-time trigger setup)
+### Daily email digest + sheet backup
 
-Two scheduled functions live in `stock_writer.gs`. Install them once:
+The `/admin` → **Digest** tab configures the daily sales digest without opening Apps Script. Enter the recipients, choose whether the daily trigger is enabled, click **Save digest settings**, and use **Send test email** only when you intend to send a real test message.
+
+The remaining weekly/monthly digest and backup triggers can be installed once:
 
 1. Apps Script → **Triggers (⏰ clock icon, left rail)** → **+ Add Trigger**:
    - `dailyDigest` → event source **Time-driven** → **Day timer** → pick an evening slot (e.g. 21:00–22:00). Emails the day's sold/restock/interest counts and receipt revenue.

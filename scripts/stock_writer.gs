@@ -106,6 +106,10 @@ function doPost(e) {
       return recordDailyReconciliation(body, out);
     if (body.action === "linkSaleReceipt")
       return linkSaleReceipt(body, out);
+    if (body.action === "updateDigestSettings")
+      return updateDigestSettings(body, out);
+    if (body.action === "sendDigestTest")
+      return sendDigestTest(body, out);
 
     const model = String(body.model || "").trim();
     const size = parseInt(body.size, 10);
@@ -1345,6 +1349,13 @@ function doGet(e) {
       });
       return out({ ok: true, leads: Object.values(leads) });
     }
+    if (kind === "reportSettings") {
+      return out({
+        ok: true,
+        reportEmails: reportEmail_(),
+        dailyEnabled: digestTriggerEnabled_("dailyDigest"),
+      });
+    }
     return out({ ok: false, error: "unknown kind" });
   } catch (err) {
     return out({ ok: false, error: String(err) });
@@ -1603,10 +1614,69 @@ function backupSheet() {
 
 function reportEmail_() {
   return (
-    PropertiesService.getScriptProperties().getProperty("REPORT_EMAILS") ||
-    PropertiesService.getScriptProperties().getProperty("REPORT_EMAIL") ||
+    reportEmails_() ||
     Session.getActiveUser().getEmail()
   );
+}
+
+function reportEmails_() {
+  return String(
+    PropertiesService.getScriptProperties().getProperty("REPORT_EMAILS") ||
+      PropertiesService.getScriptProperties().getProperty("REPORT_EMAIL") ||
+      ""
+  )
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean)
+    .join(",");
+}
+
+function digestTriggerEnabled_(handler) {
+  return ScriptApp.getProjectTriggers().some(
+    (trigger) => trigger.getHandlerFunction() === handler
+  );
+}
+
+function updateDigestSettings(body, out) {
+  const fields = body.fields || {};
+  const emails = String(fields.emails || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    !emails.length ||
+    emails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+  )
+    return out({ ok: false, error: "enter one or more valid email addresses" });
+  const dailyEnabled = fields.dailyEnabled !== false;
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("REPORT_EMAILS", emails.join(","));
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach((trigger) => {
+    if (trigger.getHandlerFunction() === "dailyDigest")
+      ScriptApp.deleteTrigger(trigger);
+  });
+  if (dailyEnabled) {
+    ScriptApp.newTrigger("dailyDigest")
+      .timeBased()
+      .everyDays(1)
+      .atHour(21)
+      .create();
+  }
+  return out({ ok: true, reportEmails: emails.join(","), dailyEnabled });
+}
+
+function sendDigestTest(body, out) {
+  const recipients = reportEmails_();
+  if (!recipients) return out({ ok: false, error: "configure digest recipients first" });
+  const now = new Date();
+  MailApp.sendEmail(
+    recipients,
+    "Petal Steps — digest test",
+    "This confirms that Petal Steps digest emails are configured correctly.\n\nSent: " +
+      now.toISOString()
+  );
+  return out({ ok: true, reportEmails: recipients });
 }
 
 // Run ONCE from the editor (Run ▶): creates the scheduled jobs. Safe to
