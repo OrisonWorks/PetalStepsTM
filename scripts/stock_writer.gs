@@ -1648,22 +1648,28 @@ function updateDigestSettings(body, out) {
     emails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
   )
     return out({ ok: false, error: "enter one or more valid email addresses" });
-  const dailyEnabled = fields.dailyEnabled !== false;
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty("REPORT_EMAILS", emails.join(","));
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach((trigger) => {
-    if (trigger.getHandlerFunction() === "dailyDigest")
-      ScriptApp.deleteTrigger(trigger);
-  });
-  if (dailyEnabled) {
-    ScriptApp.newTrigger("dailyDigest")
-      .timeBased()
-      .everyDays(1)
-      .atHour(21)
-      .create();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const dailyEnabled = fields.dailyEnabled !== false;
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty("REPORT_EMAILS", emails.join(","));
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach((trigger) => {
+      if (trigger.getHandlerFunction() === "dailyDigest")
+        ScriptApp.deleteTrigger(trigger);
+    });
+    if (dailyEnabled) {
+      ScriptApp.newTrigger("dailyDigest")
+        .timeBased()
+        .everyDays(1)
+        .atHour(21)
+        .create();
+    }
+    return out({ ok: true, reportEmails: emails.join(","), dailyEnabled });
+  } finally {
+    lock.releaseLock();
   }
-  return out({ ok: true, reportEmails: emails.join(","), dailyEnabled });
 }
 
 function sendDigestTest(body, out) {
