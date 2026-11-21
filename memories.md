@@ -288,6 +288,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Compliance writes now follow the Apps Script web-app redirect and read its JSON echo response, so registering a receipt does not remain pending after the writer accepts the POST.
 - CompliancePanel now renders its confirmation dialog; Register receipt and other confirmed actions no longer wait invisibly for an unrendered modal.
 - The system-generated Receipts admin tab is hidden for the physical-book workflow; Compliance remains the supported receipt-recording interface while existing receipt data stays available to analytics and migration logic.
+- Compliance receipt images are resized and JPEG-compressed in the browser before photo upload or OCR, keeping the base64 JSON request below Vercel's function payload limit instead of relying on the server route to reject oversized originals.
 
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
