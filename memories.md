@@ -287,6 +287,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - The Compliance API now converts an outdated Apps Script `unknown kind` response into an actionable message instructing the administrator to deploy the latest `stock_writer.gs` as a new version.
 - Compliance writes now follow the Apps Script web-app redirect and read its JSON echo response, so registering a receipt does not remain pending after the writer accepts the POST.
 - CompliancePanel now renders its confirmation dialog; Register receipt and other confirmed actions no longer wait invisibly for an unrendered modal.
+- The system-generated Receipts admin tab is hidden for the physical-book workflow; Compliance remains the supported receipt-recording interface while existing receipt data stays available to analytics and migration logic.
 
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 

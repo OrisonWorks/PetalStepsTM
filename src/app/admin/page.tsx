@@ -1328,7 +1328,7 @@ function Kpi({ label, value, hint }: { label: string; value: string | number; hi
 function DashboardPanel({ products, analytics, go }: {
   products: Product[];
   analytics: ReturnType<typeof useAnalytics>;
-  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "receipts" | "add" | "list" | "activity") => void | Promise<void>;
+  go: (v: "dashboard" | "stock" | "analytics" | "reports" | "add" | "list" | "activity") => void | Promise<void>;
 }) {
   const { data, loading, reload } = analytics;
   const [days, setDays] = useState(1);
@@ -1421,7 +1421,7 @@ function DashboardPanel({ products, analytics, go }: {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {(["stock", "analytics", "receipts", "add", "list", "activity"] as const).map((v) => (
+        {(["stock", "analytics", "add", "list", "activity"] as const).map((v) => (
           <button key={v} onClick={() => go(v)} className="rounded-full border border-rose-200 bg-white px-4 py-1.5 text-sm font-semibold text-stone-600 hover:border-rose-400">
             {v === "add" ? "add style" : v === "list" ? "mailing list" : v} →
           </button>
@@ -2253,7 +2253,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "hidden" | "matte" | "glossy" | "statement" | "red-bottom">("all");
-  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "receipts" | "compliance" | "digest" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
+  const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "compliance" | "digest" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
   const loadProducts = useCallback(async () => {
@@ -2475,7 +2475,7 @@ export default function AdminPage() {
         </button>
       </div>
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(["dashboard", "stock", "analytics", "add", "reports", "receipts", "compliance", "digest", "list", "newsletter", "leads", "activity"] as const).map((v) => (
+        {(["dashboard", "stock", "analytics", "add", "reports", "compliance", "digest", "list", "newsletter", "leads", "activity"] as const).map((v) => (
           <button
             key={v}
             onClick={() => goView(v)}
@@ -2514,7 +2514,6 @@ export default function AdminPage() {
         </div>
       )}
       {view === "reports" && <div className="mt-6"><ReportsPanel products={products} /></div>}
-      {view === "receipts" && <div className="mt-6"><ReceiptPanel products={products} /></div>}
       {view === "compliance" && <div className="mt-6"><CompliancePanel /></div>}
       {view === "digest" && <div className="mt-6"><DigestPanel /></div>}
       {view === "list" && <div className="mt-6"><SubscribersPanel /></div>}
