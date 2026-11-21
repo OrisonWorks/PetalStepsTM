@@ -127,10 +127,10 @@ export function CompliancePanel() {
     try {
       let evidenceUrl = "";
       if (receiptFile) {
-        const encoded = await fileData(receiptFile);
+        const image = await prepareImage(receiptFile);
         const upload = await fetch("/api/admin/upload-photo", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: receiptFile.type, data: encoded }),
+          body: JSON.stringify(image),
         });
         const uploadJson = await upload.json().catch(() => ({}));
         if (!upload.ok || !uploadJson.ok) throw new Error(uploadJson.error || "Could not upload receipt image");
@@ -152,10 +152,10 @@ export function CompliancePanel() {
     if (!receiptFile) return;
     setOcrLoading(true);
     try {
-      const encoded = await fileData(receiptFile);
+      const image = await prepareImage(receiptFile);
       const res = await fetch("/api/admin/compliance/ocr", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mime: receiptFile.type, data: encoded }),
+        body: JSON.stringify({ mime: image.type, data: image.data }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || "Could not scan receipt");
@@ -378,6 +378,35 @@ export function CompliancePanel() {
 
 function Kpi({ label, value, warn = false }: { label: string; value: string | number; warn?: boolean }) {
   return <div className={`rounded-xl border p-3 ${warn ? "border-amber-200 bg-amber-50" : "border-rose-100 bg-white"}`}><div className="text-xs text-stone-500">{label}</div><div className="mt-1 text-xl font-bold text-stone-800">{value}</div></div>;
+}
+
+async function prepareImage(file: File): Promise<{ type: string; data: string }> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return { type: file.type, data: await fileData(file) };
+
+  const maxSide = 1800;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    return { type: file.type, data: await fileData(file) };
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  let quality = 0.82;
+  let dataUrl = canvas.toDataURL("image/jpeg", quality);
+  while (dataUrl.length > 3.5 * 1024 * 1024 && quality > 0.45) {
+    quality -= 0.1;
+    dataUrl = canvas.toDataURL("image/jpeg", quality);
+  }
+  return {
+    type: "image/jpeg",
+    data: dataUrl.slice(dataUrl.indexOf(",") + 1),
+  };
 }
 
 function fileData(file: File) {
