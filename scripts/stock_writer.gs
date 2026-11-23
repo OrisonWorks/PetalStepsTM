@@ -207,6 +207,14 @@ function doPost(e) {
           return out({ ok: false, error: "register this physical receipt in Compliance before recording the sale" });
         if (String(receipt.status || "").trim() !== "valid")
           return out({ ok: false, error: "the receipt must have Valid sale status in Compliance before recording the sale" });
+        const receiptEvidence = String(receipt.evidence_url || "").trim();
+        const filingEvidence = sheetRows_(ss, "FILING_EVIDENCE").some(
+          (r) =>
+            String(r.name || "").trim() === "Receipt " + receiptNo &&
+            String(r.content_url || "").trim()
+        );
+        if (!receiptEvidence && !filingEvidence)
+          return out({ ok: false, error: "attach a photo of the physical receipt in Compliance before recording the sale" });
       }
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)

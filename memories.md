@@ -291,6 +291,7 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Compliance receipt images are resized and JPEG-compressed in the browser before photo upload or OCR, keeping the base64 JSON request below Vercel's function payload limit instead of relying on the server route to reject oversized originals.
 - Receipt registration now shows an in-form progress state and a persistent success confirmation; if evidence linking fails after the register write, the UI distinguishes the saved receipt from the evidence follow-up.
 - New `sold` stock writes must now reference an existing `RECEIPT_REGISTER` row with `Valid sale` status; `remove` actions remain receipt-free and historical sales remain backfillable through Compliance.
+- The agreed stricter rule requires a receipt photo as well: new `sold` writes must reference a `Valid sale` receipt with evidence stored in the register or filing-evidence record; photo evidence is not required for `remove` or historical backfill actions.
 
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
