@@ -195,8 +195,19 @@ function doPost(e) {
         body.set != null
           ? Math.max(0, parseInt(body.set, 10) || 0)
           : Math.max(0, current + (body.delta || -1));
-      if (!body.undo && !body.action && next < current && !String(body.receiptNo || "").trim())
-        return out({ ok: false, error: "receipt number required for every sale" });
+      if (!body.undo && !body.action && next < current) {
+        const receiptNo = String(body.receiptNo || "").trim();
+        if (!receiptNo)
+          return out({ ok: false, error: "receipt number required for every sale" });
+        ensureComplianceSheets_(ss);
+        const receipt = sheetRows_(ss, "RECEIPT_REGISTER").find(
+          (r) => String(r.receipt_no || "").trim() === receiptNo
+        );
+        if (!receipt)
+          return out({ ok: false, error: "register this physical receipt in Compliance before recording the sale" });
+        if (String(receipt.status || "").trim() !== "valid")
+          return out({ ok: false, error: "the receipt must have Valid sale status in Compliance before recording the sale" });
+      }
       sheet.getRange(rowIdxs[0] + 1, colIdx + 1).setValue(next);
       for (let k = 1; k < rowIdxs.length; k++)
         sheet.getRange(rowIdxs[k] + 1, colIdx + 1).setValue(0);

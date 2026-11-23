@@ -2316,7 +2316,7 @@ export default function AdminPage() {
   const adjust = async (p: Product, size: number, delta: number, action?: "remove", undo = false) => {
     let receiptNo = "";
     if (!undo && !action && delta < 0) {
-      receiptNo = window.prompt("Required receipt number for this sale:")?.trim() || "";
+      receiptNo = window.prompt("Enter the receipt number already registered as Valid sale in Admin → Compliance:")?.trim() || "";
       if (!receiptNo) {
         toast.error("A receipt number is required to record a sale");
         return;
