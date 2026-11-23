@@ -147,7 +147,7 @@ export function CompliancePanel() {
         evidenceUrl = String(uploadJson.url);
       }
       setRegisterStep("Saving receipt record…");
-      await post("registerReceipt", { receiptNo, issueDate, period, status, amount, client, items });
+      await post("registerReceipt", { receiptNo, issueDate, period, status, amount, client, items, evidenceUrl });
       receiptSaved = true;
       setRegisteredReceipt(savedReceiptNo);
       if (evidenceUrl) {
