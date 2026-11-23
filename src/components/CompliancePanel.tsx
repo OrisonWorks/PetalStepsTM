@@ -48,6 +48,10 @@ export function CompliancePanel() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [ocrText, setOcrText] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [registerStep, setRegisterStep] = useState("");
+  const [registeredReceipt, setRegisteredReceipt] = useState("");
+  const [registeredEvidence, setRegisteredEvidence] = useState<boolean | null>(null);
   const [reconDate, setReconDate] = useState(new Date().toISOString().slice(0, 10));
   const [cashTotal, setCashTotal] = useState("");
   const [mobileMoneyTotal, setMobileMoneyTotal] = useState("");
@@ -124,6 +128,12 @@ export function CompliancePanel() {
   const addReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!(await ask({ title: `Register receipt ${receiptNo}?`, body: "Receipt numbers are permanent and cannot be reused.", confirmLabel: "Register receipt" }))) return;
+    const savedReceiptNo = receiptNo.trim();
+    setRegistering(true);
+    setRegisterStep(receiptFile ? "Uploading receipt evidence…" : "Saving receipt record…");
+    setRegisteredReceipt("");
+    setRegisteredEvidence(null);
+    let receiptSaved = false;
     try {
       let evidenceUrl = "";
       if (receiptFile) {
@@ -136,16 +146,32 @@ export function CompliancePanel() {
         if (!upload.ok || !uploadJson.ok) throw new Error(uploadJson.error || "Could not upload receipt image");
         evidenceUrl = String(uploadJson.url);
       }
+      setRegisterStep("Saving receipt record…");
       await post("registerReceipt", { receiptNo, issueDate, period, status, amount, client, items });
+      receiptSaved = true;
+      setRegisteredReceipt(savedReceiptNo);
       if (evidenceUrl) {
+        setRegisterStep("Linking receipt evidence…");
         await post("addFilingEvidence", {
           period, type: "receipt_image", name: `Receipt ${receiptNo}`, contentUrl: evidenceUrl,
         });
+        setRegisteredEvidence(true);
+      } else {
+        setRegisteredEvidence(false);
       }
       setReceiptNo(""); setIssueDate(""); setAmount(""); setClient(""); setItems("");
       setReceiptFile(null); setOcrText("");
+      setRegisteredReceipt(savedReceiptNo);
+      setRegisterStep("");
       toast.success("Receipt registered");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not register receipt"); }
+    } catch (e) {
+      setRegisterStep("");
+      toast.error(receiptSaved
+        ? "Receipt was saved, but its evidence link needs attention"
+        : e instanceof Error ? e.message : "Could not register receipt");
+    } finally {
+      setRegistering(false);
+    }
   };
 
   const scanReceipt = async () => {
@@ -279,6 +305,15 @@ export function CompliancePanel() {
       </div>
       <div className="rounded-2xl border border-rose-100 bg-white p-4">
         <h2 className="font-semibold text-stone-800">Register a physical or digital receipt</h2>
+        {registeredReceipt && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status" aria-live="polite">
+            <span aria-hidden="true">✓</span>
+            <span><b>Receipt {registeredReceipt} was added.</b>{" "}
+              {registeredEvidence ? "The register and attached evidence are saved." : "The receipt register is saved."}
+            </span>
+            <button type="button" onClick={() => setRegisteredReceipt("")} className="ml-auto text-xs font-semibold underline">Dismiss</button>
+          </div>
+        )}
         <form onSubmit={addReceipt} className="mt-3 grid gap-2 sm:grid-cols-3">
           <input required placeholder="Receipt no. e.g. 010" value={receiptNo} onChange={(e) => setReceiptNo(e.target.value)} className={fieldCls} />
           <input required type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className={fieldCls} />
@@ -287,11 +322,14 @@ export function CompliancePanel() {
           <input inputMode="numeric" placeholder="Amount K" value={amount} onChange={(e) => setAmount(e.target.value)} className={fieldCls} />
           <input placeholder="Item description" value={items} onChange={(e) => setItems(e.target.value)} className={fieldCls} />
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} className={fieldCls} />
-          <button type="button" disabled={!receiptFile || ocrLoading} onClick={() => void scanReceipt()} className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-50">
+          <button type="button" disabled={!receiptFile || ocrLoading || registering} onClick={() => void scanReceipt()} className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-50">
             {ocrLoading ? "Scanning…" : "Scan receipt (draft)"}
           </button>
           {ocrText && <textarea readOnly value={ocrText} aria-label="OCR draft" className={`${fieldCls} min-h-24 sm:col-span-3`} />}
-          <button className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white sm:col-span-3">Register receipt</button>
+          <button disabled={registering} className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-3">
+            {registering ? registerStep || "Saving…" : "Register receipt"}
+          </button>
+          {registering && <p className="flex items-center gap-2 text-sm text-stone-500 sm:col-span-3" role="status" aria-live="polite"><span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-rose-200 border-t-rose-500" aria-hidden="true" />Please keep this page open while the receipt is being saved.</p>}
         </form>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
