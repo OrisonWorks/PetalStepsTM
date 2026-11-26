@@ -6,7 +6,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 
 type RegisterRow = {
   receipt_no: string; issue_date: string; period: string; status: string;
-  client?: string; amount?: string | number; items?: string; notes?: string;
+  client?: string; amount?: string | number; items?: string; notes?: string; evidence_url?: string;
 };
 type ExceptionRow = {
   id: string; period: string; receipt_no?: string; type: string;
@@ -52,6 +52,7 @@ export function CompliancePanel() {
   const [registerStep, setRegisterStep] = useState("");
   const [registeredReceipt, setRegisteredReceipt] = useState("");
   const [registeredEvidence, setRegisteredEvidence] = useState<boolean | null>(null);
+  const [evidenceSaving, setEvidenceSaving] = useState("");
   const [reconDate, setReconDate] = useState(new Date().toISOString().slice(0, 10));
   const [cashTotal, setCashTotal] = useState("");
   const [mobileMoneyTotal, setMobileMoneyTotal] = useState("");
@@ -199,6 +200,25 @@ export function CompliancePanel() {
       toast.error(e instanceof Error ? e.message : "Could not scan receipt");
     } finally {
       setOcrLoading(false);
+    }
+  };
+
+  const replaceEvidence = async (receipt: RegisterRow, file: File) => {
+    setEvidenceSaving(receipt.receipt_no);
+    try {
+      const image = await prepareImage(file);
+      const upload = await fetch("/api/admin/upload-photo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(image),
+      });
+      const uploadJson = await upload.json().catch(() => ({}));
+      if (!upload.ok || !uploadJson.ok) throw new Error(uploadJson.error || "Could not upload replacement image");
+      await post("updateReceiptEvidence", { receiptNo: receipt.receipt_no, evidenceUrl: String(uploadJson.url) });
+      toast.success(`Receipt ${receipt.receipt_no} evidence updated`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update receipt evidence");
+    } finally {
+      setEvidenceSaving("");
     }
   };
 
@@ -376,6 +396,27 @@ export function CompliancePanel() {
             Record TaxOnline submission
           </button>
           <div className="mt-4 space-y-1 text-sm text-stone-600">{(data?.periods || []).filter((p) => p.period === period).map((p) => <p key={p.period}>Status: <b>{p.status}</b> · Last saved gross: K{Number(p.gross_turnover || 0).toLocaleString()}</p>)}</div>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-rose-100 bg-white p-4">
+        <h2 className="font-semibold text-stone-800">Receipt evidence</h2>
+        <p className="mt-2 text-sm text-stone-500">Replace a receipt photo if it is unclear or incorrect. The register record stays unchanged.</p>
+        <div className="mt-3 space-y-2">
+          {current.filter((r) => r.evidence_url).map((receipt) => (
+            <div key={receipt.receipt_no} className="flex flex-wrap items-center gap-3 rounded-lg bg-stone-50 p-2 text-sm">
+              <a href={receipt.evidence_url} target="_blank" rel="noreferrer" className="font-semibold text-rose-600 underline">Receipt {receipt.receipt_no}</a>
+              <span className="text-stone-500">{receipt.issue_date} · {receipt.status}</span>
+              <label className="ml-auto cursor-pointer rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white">
+                {evidenceSaving === receipt.receipt_no ? "Uploading…" : "Replace photo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={Boolean(evidenceSaving)} onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void replaceEvidence(receipt, file);
+                  e.currentTarget.value = "";
+                }} />
+              </label>
+            </div>
+          ))}
+          {!current.some((r) => r.evidence_url) && <p className="text-sm text-stone-400">No receipt photos are attached for this period.</p>}
         </div>
       </div>
       <div className="rounded-2xl border border-rose-100 bg-white p-4">

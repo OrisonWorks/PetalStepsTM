@@ -92,6 +92,8 @@ function doPost(e) {
     if (body.action === "uploadPhoto") return uploadPhoto(body, out);
     if (body.action === "registerReceipt")
       return registerReceipt(body, out);
+    if (body.action === "updateReceiptEvidence")
+      return updateReceiptEvidence(body, out);
     if (body.action === "syncReceiptRegister")
       return syncReceiptRegister(body, out);
     if (body.action === "recordReceiptException")
@@ -561,6 +563,40 @@ function registerReceipt(body, out) {
       safe_(f.method || ""), safe_(f.notes || ""), now, now, safe_(f.evidenceUrl || "")
     ]);
     return out({ ok: true, receiptNo: no });
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
+  }
+}
+
+function updateReceiptEvidence(body, out) {
+  const f = body.fields || {};
+  const no = String(f.receiptNo || "").trim();
+  const url = String(f.evidenceUrl || "").trim();
+  if (!no || !url) return out({ ok: false, error: "receipt number and evidence URL required" });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureComplianceSheets_(ss);
+    const register = ss.getSheetByName("RECEIPT_REGISTER");
+    const data = register.getDataRange().getValues();
+    const headers = data[0].map((h) => String(h).trim().toLowerCase());
+    const noCol = headers.indexOf("receipt_no");
+    const evidenceCol = headers.indexOf("evidence_url");
+    const rowIndex = data.findIndex((row, i) => i > 0 && String(row[noCol]).trim() === no);
+    if (rowIndex < 0) return out({ ok: false, error: "receipt not found" });
+    register.getRange(rowIndex + 1, evidenceCol + 1).setValue(safe_(url));
+    const evidence = ss.getSheetByName("FILING_EVIDENCE");
+    const evidenceData = evidence.getDataRange().getValues();
+    const evidenceHeaders = evidenceData[0].map((h) => String(h).trim().toLowerCase());
+    const nameCol = evidenceHeaders.indexOf("name");
+    const contentCol = evidenceHeaders.indexOf("content_url");
+    const evidenceRow = evidenceData.findIndex(
+      (row, i) => i > 0 && String(row[nameCol]).trim() === "Receipt " + no
+    );
+    if (evidenceRow >= 0) evidence.getRange(evidenceRow + 1, contentCol + 1).setValue(safe_(url));
+    return out({ ok: true, receiptNo: no, evidenceUrl: url });
   } finally {
     SpreadsheetApp.flush();
     lock.releaseLock();
