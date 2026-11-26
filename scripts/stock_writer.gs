@@ -204,7 +204,7 @@ function doPost(e) {
           return out({ ok: false, error: "receipt number required for every sale" });
         ensureComplianceSheets_(ss);
         const receipt = sheetRows_(ss, "RECEIPT_REGISTER").find(
-          (r) => String(r.receipt_no || "").trim() === receiptNo
+          (r) => receiptKey_(r.receipt_no) === receiptKey_(receiptNo)
         );
         if (!receipt)
           return out({ ok: false, error: "register this physical receipt in Compliance before recording the sale" });
@@ -245,6 +245,11 @@ function doPost(e) {
   } catch (err) {
     return out({ ok: false, error: String(err) });
   }
+}
+
+function receiptKey_(value) {
+  const text = String(value || "").trim().toUpperCase();
+  return /^\d+$/.test(text) ? text.replace(/^0+(?=\d)/, "") : text;
 }
 
 // Writes product metadata overrides (name/price/category/description/photo/
@@ -550,7 +555,7 @@ function registerReceipt(body, out) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureComplianceSheets_(ss);
     const rows = sheetRows_(ss, "RECEIPT_REGISTER");
-    if (rows.some((r) => String(r.receipt_no) === no))
+    if (rows.some((r) => receiptKey_(r.receipt_no) === receiptKey_(no)))
       return out({ ok: false, error: "receipt already registered" });
     const now = new Date();
     appendComplianceRow_(ss, "RECEIPT_REGISTER", [
@@ -584,7 +589,9 @@ function updateReceiptEvidence(body, out) {
     const headers = data[0].map((h) => String(h).trim().toLowerCase());
     const noCol = headers.indexOf("receipt_no");
     const evidenceCol = headers.indexOf("evidence_url");
-    const rowIndex = data.findIndex((row, i) => i > 0 && String(row[noCol]).trim() === no);
+    const rowIndex = data.findIndex(
+      (row, i) => i > 0 && receiptKey_(row[noCol]) === receiptKey_(no)
+    );
     if (rowIndex < 0) return out({ ok: false, error: "receipt not found" });
     register.getRange(rowIndex + 1, evidenceCol + 1).setValue(safe_(url));
     const evidence = ss.getSheetByName("FILING_EVIDENCE");
