@@ -203,9 +203,16 @@ function doPost(e) {
         if (!receiptNo)
           return out({ ok: false, error: "receipt number required for every sale" });
         ensureComplianceSheets_(ss);
-        const receipt = sheetRows_(ss, "RECEIPT_REGISTER").find(
+        const receiptRows = sheetRows_(ss, "RECEIPT_REGISTER");
+        const exactReceipt = receiptRows.find(
           (r) => String(r.receipt_no || "").trim() === receiptNo
         );
+        const equivalentReceipts = receiptRows.filter(
+          (r) => receiptKey_(r.receipt_no) === receiptKey_(receiptNo)
+        );
+        if (!exactReceipt && equivalentReceipts.length > 1)
+          return out({ ok: false, error: "receipt number is ambiguous; use the exact registered number" });
+        const receipt = exactReceipt || equivalentReceipts[0];
         if (!receipt)
           return out({ ok: false, error: "register this physical receipt in Compliance before recording the sale" });
         if (String(receipt.status || "").trim() !== "valid")
@@ -213,7 +220,7 @@ function doPost(e) {
         const receiptEvidence = String(receipt.evidence_url || "").trim();
         const filingEvidence = sheetRows_(ss, "FILING_EVIDENCE").some(
           (r) =>
-            String(r.name || "").trim() === "Receipt " + receiptNo &&
+            receiptKey_(String(r.name || "").trim().replace(/^Receipt\s+/i, "")) === receiptKey_(receiptNo) &&
             String(r.content_url || "").trim()
         );
         if (!receiptEvidence && !filingEvidence)
@@ -245,6 +252,11 @@ function doPost(e) {
   } catch (err) {
     return out({ ok: false, error: String(err) });
   }
+}
+
+function receiptKey_(value) {
+  const text = String(value || "").trim();
+  return /^\d+$/.test(text) ? text.replace(/^0+(?=\d)/, "") : text;
 }
 
 // Writes product metadata overrides (name/price/category/description/photo/
@@ -550,7 +562,7 @@ function registerReceipt(body, out) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureComplianceSheets_(ss);
     const rows = sheetRows_(ss, "RECEIPT_REGISTER");
-    if (rows.some((r) => String(r.receipt_no) === no))
+    if (rows.some((r) => receiptKey_(r.receipt_no) === receiptKey_(no)))
       return out({ ok: false, error: "receipt already registered" });
     const now = new Date();
     appendComplianceRow_(ss, "RECEIPT_REGISTER", [
@@ -584,7 +596,16 @@ function updateReceiptEvidence(body, out) {
     const headers = data[0].map((h) => String(h).trim().toLowerCase());
     const noCol = headers.indexOf("receipt_no");
     const evidenceCol = headers.indexOf("evidence_url");
-    const rowIndex = data.findIndex((row, i) => i > 0 && String(row[noCol]).trim() === no);
+    const exactRowIndex = data.findIndex(
+      (row, i) => i > 0 && String(row[noCol]).trim() === no
+    );
+    const equivalentRows = data.reduce((matches, row, i) => {
+      if (i > 0 && receiptKey_(row[noCol]) === receiptKey_(no)) matches.push(i);
+      return matches;
+    }, []);
+    if (exactRowIndex < 0 && equivalentRows.length > 1)
+      return out({ ok: false, error: "receipt number is ambiguous; use the exact registered number" });
+    const rowIndex = exactRowIndex >= 0 ? exactRowIndex : equivalentRows[0];
     if (rowIndex < 0) return out({ ok: false, error: "receipt not found" });
     register.getRange(rowIndex + 1, evidenceCol + 1).setValue(safe_(url));
     const evidence = ss.getSheetByName("FILING_EVIDENCE");
