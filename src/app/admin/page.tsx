@@ -1782,6 +1782,7 @@ function LeadsPanel({ products }: { products: Product[] }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [show, setShow] = useState<"all" | "stocked" | "restock">("all");
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     setState("loading");
@@ -1809,7 +1810,12 @@ function LeadsPanel({ products }: { products: Product[] }) {
     const s = parseInt(l.size, 10);
     return { l, p, inStock: p ? (p.stock[s] || 0) > 0 : false };
   });
-  const shown = rows.filter((r) => (show === "all" ? true : show === "stocked" ? r.inStock : !r.inStock));
+  const query = search.trim().toLowerCase();
+  const shown = rows.filter((r) => {
+    if (show !== "all" && (show === "stocked" ? !r.inStock : r.inStock)) return false;
+    return !query || [r.l.model, r.l.size, r.l.who, r.l.phone, r.p?.name, r.p?.color]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+  });
   const pg = usePager(shown, 15);
 
   // Goes through /api/admin/send-update: Cloud API send when Meta is wired
@@ -1859,6 +1865,13 @@ function LeadsPanel({ products }: { products: Product[] }) {
             {f === "all" ? "All" : f === "stocked" ? "In stock" : "Needs restock"}
           </button>
         ))}
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); pg.setPage(1); }}
+          placeholder="Search style, size, client…"
+          aria-label="Search leads"
+          className="min-w-52 flex-1 rounded-lg border border-rose-100 px-3 py-1.5 text-sm outline-none focus:border-rose-300"
+        />
         <button
           onClick={() =>
             downloadCsv(
@@ -1953,6 +1966,7 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
   const { data, loading, reload } = analytics;
   const { ask, dialog } = useConfirm();
   const [filter, setFilter] = useState<"all" | "stock" | "taps" | "admin">("all");
+  const [search, setSearch] = useState("");
   const rawRows = data?.log || [];
   const rows = rawRows.slice().reverse();
   const correctedKeys = correctedSaleKeys(rawRows);
@@ -1962,7 +1976,11 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
     taps: (a) => a === "interest",
     admin: (a) => ["edit", "create", "receipt", "unsubscribe", "newsletter", "whatsapp"].includes(a),
   };
-  const shown = rows.filter((r) => groups[filter](r.action));
+  const query = search.trim().toLowerCase();
+  const shown = rows.filter((r) =>
+    groups[filter](r.action) &&
+    (!query || [r.action, r.model, r.size, r.note].some((value) => String(value || "").toLowerCase().includes(query)))
+  );
   const pg = usePager(shown, 15);
   const bySku = new Map(products.map((p) => [p.sku, p]));
   const voidSale = async (r: LogRow) => {
@@ -2047,6 +2065,13 @@ function ActivityPanel({ analytics, products }: { analytics: ReturnType<typeof u
             {label}
           </button>
         ))}
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); pg.setPage(1); }}
+          placeholder="Search action, SKU, size, note…"
+          aria-label="Search activity"
+          className="min-w-56 flex-1 rounded-lg border border-rose-100 px-3 py-1.5 text-sm outline-none focus:border-rose-300"
+        />
       </div>
       {shown.length === 0 ? (
         <p className="mt-4 text-sm text-stone-400">Nothing logged yet — events appear here as they happen.</p>
@@ -2253,6 +2278,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out" | "hidden" | "matte" | "glossy" | "statement" | "red-bottom">("all");
+  const [stockSearch, setStockSearch] = useState("");
   const [view, setView] = useState<"dashboard" | "stock" | "analytics" | "reports" | "compliance" | "digest" | "add" | "list" | "newsletter" | "leads" | "activity">("dashboard");
   const analytics = useAnalytics();
 
@@ -2400,6 +2426,8 @@ export default function AdminPage() {
   };
 
   const stockShown = products.filter((p) => {
+    const query = stockSearch.trim().toLowerCase();
+    if (query && ![p.sku, p.name, p.color, p.cat].some((value) => String(value || "").toLowerCase().includes(query))) return false;
     const tp = totalPairs(p);
     if (stockFilter === "hidden") return !!p.hidden;
     if (stockFilter === "low") return tp > 0 && tp <= 5;
@@ -2528,8 +2556,15 @@ export default function AdminPage() {
       )}
       {view === "stock" && <div className="mt-6 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={stockSearch}
+            onChange={(e) => { setStockSearch(e.target.value); stockPg.setPage(1); }}
+            placeholder="Search style, SKU, colour…"
+            aria-label="Search stock"
+            className="min-w-56 flex-1 rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300"
+          />
           {([
-            ["all", `All (${products.length})`],
+            ["all", `All (${stockSearch.trim() ? stockShown.length : products.length})`],
             ["low", "Low stock"],
             ["out", "Sold out"],
             ["hidden", `Hidden (${products.filter((p) => p.hidden).length})`],

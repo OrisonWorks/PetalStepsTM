@@ -292,6 +292,8 @@ Living record of what has been built and how the pieces fit together. **Update t
 - Receipt registration now shows an in-form progress state and a persistent success confirmation; if evidence linking fails after the register write, the UI distinguishes the saved receipt from the evidence follow-up.
 - New `sold` stock writes must now reference an existing `RECEIPT_REGISTER` row with `Valid sale` status; `remove` actions remain receipt-free and historical sales remain backfillable through Compliance.
 - The agreed stricter rule requires a receipt photo as well: new `sold` writes must reference a `Valid sale` receipt with evidence stored in the register or filing-evidence record; photo evidence is not required for `remove` or historical backfill actions.
+- Admin navigation now supports client-side search for stock styles, open leads, activity events, and historical sales awaiting receipt backfill; existing category/status/date filters remain available.
+- The stock writer receipt-validation path uses the active spreadsheet variable; the live `ss is not defined` sale error was caused by a deployment containing the validation code before this variable fix.
 
 ### 2026-10-27 — Sheet inventory + admin foundation (PRs #1–#7)
 
