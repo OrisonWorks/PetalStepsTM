@@ -59,6 +59,7 @@ export function CompliancePanel() {
   const [outstandingTotal, setOutstandingTotal] = useState("");
   const [reconNotes, setReconNotes] = useState("");
   const [legacySales, setLegacySales] = useState<LegacySale[]>([]);
+  const [legacySearch, setLegacySearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -91,6 +92,13 @@ export function CompliancePanel() {
     setActualTax("");
   }, [period, savedPeriod?.ack_ref, savedPeriod?.payment_ref]);
   const open = data?.exceptions.filter((e) => e.period === period && e.status !== "resolved") || [];
+  const legacyQuery = legacySearch.trim().toLowerCase();
+  const shownLegacySales = legacySales.filter((sale) =>
+    !legacyQuery ||
+    [sale.ts, sale.model, sale.size, sale.note].some((value) =>
+      String(value || "").toLowerCase().includes(legacyQuery)
+    )
+  );
   const gross = current.filter((r) => r.status === "valid").reduce((n, r) => n + (Number(r.amount) || 0), 0);
   const reconReceipts = data?.register.filter((r) => r.issue_date === reconDate && r.status === "valid").reduce((n, r) => n + (Number(r.amount) || 0), 0) || 0;
   const planningTax = gross > 2500 ? Math.round((gross - 2500) * 0.05) : 0;
@@ -392,8 +400,15 @@ export function CompliancePanel() {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <h2 className="font-semibold text-stone-800">Backfill receipts for older sales</h2>
         <p className="mt-2 text-sm text-stone-600">These links do not change stock, revenue, or the original sale timestamp. Enter only a receipt verified against the physical book.</p>
+        <input
+          value={legacySearch}
+          onChange={(e) => setLegacySearch(e.target.value)}
+          placeholder="Search timestamp, SKU, size, or sale note…"
+          aria-label="Search older sales missing receipt evidence"
+          className={`${fieldCls} mt-3`}
+        />
         <div className="mt-3 space-y-2">
-          {legacySales.slice(0, 20).map((sale) => (
+          {shownLegacySales.slice(0, 20).map((sale) => (
             <div key={`${sale.ts}-${sale.model}-${sale.size}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-sm">
               <span className="min-w-0 flex-1"><b>{sale.ts}</b> · {sale.model} · EU {sale.size} · {sale.note}</span>
               <input
@@ -404,8 +419,8 @@ export function CompliancePanel() {
               />
             </div>
           ))}
-          {!legacySales.length && <p className="text-sm text-emerald-700">No older sales are missing a receipt link.</p>}
-          {legacySales.length > 20 && <p className="text-xs text-stone-500">Showing the first 20; refresh after linking to continue.</p>}
+          {!shownLegacySales.length && <p className="text-sm text-emerald-700">{legacySales.length ? "No matching older sales." : "No older sales are missing a receipt link."}</p>}
+          {shownLegacySales.length > 20 && <p className="text-xs text-stone-500">Showing the first 20; refine your search to find the rest.</p>}
         </div>
       </div>
       </section>

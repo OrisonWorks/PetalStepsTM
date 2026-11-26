@@ -120,6 +120,7 @@ function doPost(e) {
     if (!lock.tryLock(30000)) return out({ ok: false, error: "busy" });
     try {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+      const ss = sheet.getParent();
       const data = sheet.getDataRange().getValues();
       const headers = data[0].map((h) =>
         String(h).trim().toLowerCase().replace(/\s+/g, "_")
